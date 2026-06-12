@@ -26,7 +26,7 @@ RubyGems.org checksum comparison when needed
 Actionable report for CI or local review
 ```
 
-This proves whether your lockfile is using Bundler checksum protection and whether any locked gems are missing expected checksum data. It does **not** yet prove source provenance such as signed tag → CI build → published gem.
+This reports whether your lockfile is using Bundler checksum protection and whether any locked gems are missing expected checksum data. It does **not** yet prove source provenance such as signed tag → CI build → published gem.
 
 ## Installation
 
@@ -81,8 +81,6 @@ gem-guardian verify --lockfile path/to/Gemfile.lock
 
 ## Roadmap
 
-- `gem-guardian lock` to emit or update Bundler checksum metadata.
-- First-class Bundler `CHECKSUMS` audit mode with missing-checksum reporting and CI-friendly exit codes.
 - Machine-readable JSON output for CI.
 - Provenance verification for gems published through Trusted Publishing.
 - GitHub Release checksum/signature discovery.

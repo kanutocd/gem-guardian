@@ -2,6 +2,7 @@
 
 module Gem
   module Guardian
+    # gem-guardian version.
     VERSION = "0.1.0"
   end
 end

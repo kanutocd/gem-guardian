@@ -6,7 +6,9 @@ require "uri"
 
 module Gem
   module Guardian
+    # Reads checksum metadata from RubyGems.org and downloads gem artifacts.
     class RubygemsClient
+      # Default RubyGems.org endpoint used by the client.
       DEFAULT_HOST = "https://rubygems.org"
 
       def initialize(host: DEFAULT_HOST, http: Net::HTTP)
@@ -14,6 +16,7 @@ module Gem
         @http = http
       end
 
+      # Returns the expected SHA256 checksum for +dependency+.
       def expected_sha256(dependency)
         versions = JSON.parse(get("/api/v1/versions/#{dependency.name}.json"))
         version = versions.find do |item|
@@ -21,11 +24,15 @@ module Gem
         end
 
         sha = version && (version["sha"] || version["sha256"] || version["checksum"])
-        raise ChecksumNotFound, "No SHA256 found for #{dependency.name} #{dependency.version} #{dependency.platform}" if blank?(sha)
+        if blank?(sha)
+          raise ChecksumNotFound,
+                "No SHA256 found for #{dependency.name} #{dependency.version} #{dependency.platform}"
+        end
 
         sha.downcase
       end
 
+      # Downloads the .gem file for +dependency+ into +destination+.
       def download_gem(dependency, destination)
         body = get("/downloads/#{dependency.gem_filename}")
         File.binwrite(destination, body)
@@ -36,6 +43,7 @@ module Gem
 
       private
 
+      # GETs +path+ from the configured host and returns the response body.
       def get(path)
         uri = URI("#{@host}#{path}")
         response = @http.get_response(uri)
@@ -44,12 +52,14 @@ module Gem
         raise Error, "GET #{uri} failed with #{response.code} #{response.message}"
       end
 
+      # Compares a RubyGems platform string with the requested platform.
       def platform_matches?(remote_platform, wanted_platform)
         normalized_remote = remote_platform.to_s.empty? ? "ruby" : remote_platform.to_s
         normalized_wanted = wanted_platform.to_s.empty? ? "ruby" : wanted_platform.to_s
         normalized_remote == normalized_wanted
       end
 
+      # Returns true when +value+ is nil or empty.
       def blank?(value)
         value.nil? || value.to_s.empty?
       end

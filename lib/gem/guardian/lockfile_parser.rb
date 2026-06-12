@@ -2,14 +2,20 @@
 
 module Gem
   module Guardian
+    # Parses Gemfile.lock and exposes dependencies and checksum data.
     class LockfileParser
+      # Matches dependency lines in the specs section.
       GEM_LINE = /^ {4}([A-Za-z0-9_.-]+) \(([^)]+)\)/
+      # Matches checksum lines in the CHECKSUMS section.
       CHECKSUM_LINE = /^ {2}([A-Za-z0-9_.-]+) \(([^)]+)\) (.+)$/
+      # Parsed lockfile data for the verify command.
       LockfileData = Data.define(:dependencies, :checksums, :checksums_section_present) do
+        # Returns the checksum for +dependency+ and +algorithm+, if present.
         def checksum_for(dependency, algorithm = "sha256")
           checksums.fetch(dependency, {}).fetch(algorithm, nil)
         end
 
+        # Returns a dependency => sha256 checksum map.
         def sha256_checksums
           checksums.each_with_object({}) do |(dependency, algorithms), memo|
             digest = algorithms["sha256"]
@@ -17,10 +23,12 @@ module Gem
           end
         end
 
+        # Returns dependencies that do not have a sha256 checksum.
         def missing_checksum_dependencies
           dependencies.reject { |dependency| sha256_checksums.key?(dependency) }
         end
 
+        # Returns true if the lockfile contained a CHECKSUMS section.
         def checksums_present?
           checksums_section_present
         end
@@ -30,6 +38,7 @@ module Gem
         @path = path
       end
 
+      # Parses the lockfile into dependencies and checksum metadata.
       def parse
         raise LockfileError, "Lockfile not found: #{@path}" unless File.file?(@path)
 
@@ -81,10 +90,12 @@ module Gem
         LockfileData.new(dependencies, checksums, checksums.any?)
       end
 
+      # Returns the dependencies listed in the lockfile.
       def dependencies
         parse.dependencies
       end
 
+      # Returns the raw checksum map extracted from the lockfile.
       def checksums
         parse.checksums
       end

@@ -2,12 +2,16 @@
 
 module Gem
   module Guardian
-    VerificationResult = Data.define(:dependency, :expected_sha256, :actual_sha256, :artifact_path, :status, :error, :checksum_source) do
+    # Result object for a single verification attempt.
+    VerificationResult = Data.define(:dependency, :expected_sha256, :actual_sha256, :artifact_path, :status, :error,
+                                     :checksum_source) do
+      # Returns true when the verification succeeded.
       def ok?
         status == :ok
       end
     end
 
+    # Verifies gem artifacts against an expected checksum source.
     class Verifier
       def initialize(client: RubygemsClient.new, artifact_store: nil, expected_checksums: {})
         @client = client
@@ -15,6 +19,7 @@ module Gem
         @expected_checksums = expected_checksums
       end
 
+      # Verifies one dependency and returns a VerificationResult.
       def verify(dependency)
         expected, checksum_source = expected_sha256_for(dependency)
         artifact_path = @artifact_store.path_for(dependency)
@@ -42,12 +47,14 @@ module Gem
         )
       end
 
+      # Verifies each dependency in +dependencies+.
       def verify_all(dependencies)
         dependencies.map { |dependency| verify(dependency) }
       end
 
       private
 
+      # Constant-time comparison for checksum strings.
       def secure_compare(left, right)
         left = left.to_s
         right = right.to_s
@@ -56,6 +63,7 @@ module Gem
         left.bytes.zip(right.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
       end
 
+      # Uses lockfile checksums first and falls back to RubyGems metadata.
       def expected_sha256_for(dependency)
         if @expected_checksums.key?(dependency)
           [@expected_checksums.fetch(dependency), :lockfile]

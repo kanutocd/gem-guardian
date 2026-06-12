@@ -1,13 +1,19 @@
 # frozen_string_literal: true
 
+# Namespace for gem-guardian CLI code.
 module Gem
+  # Command-line interface and output helpers.
   module Guardian
+    # Command-line entry point for gem-guardian.
+    # rubocop:disable Metrics/ClassLength
     class CLI
+      # Starts the CLI with the provided argv.
       def self.start(argv)
         new(argv).run
       end
 
-      def initialize(argv, stdout: $stdout, stderr: $stderr, verifier_class: Verifier, lockfile_parser_class: LockfileParser)
+      def initialize(argv, stdout: $stdout, stderr: $stderr, verifier_class: Verifier,
+                     lockfile_parser_class: LockfileParser)
         @argv = argv.dup
         @stdout = stdout
         @stderr = stderr
@@ -15,6 +21,7 @@ module Gem
         @lockfile_parser_class = lockfile_parser_class
       end
 
+      # Dispatches the requested subcommand and returns an exit status.
       def run
         command = @argv.shift
         case command
@@ -35,6 +42,7 @@ module Gem
 
       private
 
+      # Runs the verify subcommand.
       def verify
         lockfile = option_value("--lockfile") || "Gemfile.lock"
         gems = @argv
@@ -53,9 +61,7 @@ module Gem
 
         results = @verifier_class.new(expected_checksums: lockfile_data&.sha256_checksums || {}).verify_all(dependencies)
         print_results(results, lockfile_mode: !lockfile_data.nil?)
-        if lockfile_data
-          print_lockfile_coverage(lockfile_data)
-        end
+        print_lockfile_coverage(lockfile_data) if lockfile_data
 
         all_ok = results.all?(&:ok?)
         all_covered = lockfile_data.nil? || lockfile_data.missing_checksum_dependencies.empty?
@@ -65,6 +71,7 @@ module Gem
         1
       end
 
+      # Parses a GEM:VERSION[:PLATFORM] spec string.
       def parse_gem_spec(spec)
         name, version, platform = spec.split(":", 3)
         raise Error, "Expected GEM:VERSION[:PLATFORM], got: #{spec}" if name.to_s.empty? || version.to_s.empty?
@@ -72,6 +79,7 @@ module Gem
         Dependency.new(name:, version:, platform: platform || "ruby")
       end
 
+      # Returns and removes an option value from argv.
       def option_value(name)
         index = @argv.index(name)
         return unless index
@@ -83,6 +91,7 @@ module Gem
         value
       end
 
+      # Prints verification results in a concise human-readable format.
       def print_results(results, lockfile_mode:)
         results.each do |result|
           dependency = result.dependency
@@ -104,6 +113,7 @@ module Gem
         end
       end
 
+      # Prints lockfile checksum coverage information.
       def print_lockfile_coverage(lockfile_data)
         covered = lockfile_data.dependencies.size - lockfile_data.missing_checksum_dependencies.size
         total = lockfile_data.dependencies.size
@@ -114,6 +124,7 @@ module Gem
         end
       end
 
+      # Prints usage text.
       def usage(io = @stdout)
         io.puts <<~USAGE
           gem-guardian #{VERSION}
@@ -130,5 +141,6 @@ module Gem
         USAGE
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

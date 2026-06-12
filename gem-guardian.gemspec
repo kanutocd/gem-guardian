@@ -9,7 +9,9 @@ Gem::Specification.new do |spec|
   spec.email = ["kenneth.c.demanawa@gmail.com"]
 
   spec.summary = "Consumer-side integrity verification for Ruby gems."
-  spec.description = "Audits Bundler checksum coverage and verifies Ruby gem artifacts against RubyGems SHA256 checksums when needed."
+  spec.description = <<~DESC
+    Audits Bundler checksum coverage and verifies Ruby gem artifacts against RubyGems SHA256 checksums when needed.
+  DESC
   spec.homepage = "https://github.com/kanutocd/gem-guardian"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"

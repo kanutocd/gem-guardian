@@ -1,3 +1,7 @@
+# Gem Guardian provides small, explicit verification and audit helpers for Ruby gems.
+#
+# The library is intentionally organized as a set of focused objects rather than a
+# framework so the CLI, tests, and signatures stay easy to reason about.
 # frozen_string_literal: true
 
 require_relative "guardian/version"

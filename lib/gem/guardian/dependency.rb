@@ -2,7 +2,9 @@
 
 module Gem
   module Guardian
+    # A gem dependency identified by name, version, and platform.
     Dependency = Data.define(:name, :version, :platform) do
+      # Returns the canonical .gem filename for this dependency.
       def gem_filename
         platform_suffix = platform && platform != "ruby" ? "-#{platform}" : ""
         "#{name}-#{version}#{platform_suffix}.gem"
