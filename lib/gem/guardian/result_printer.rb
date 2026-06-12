@@ -114,9 +114,10 @@ module Gem
 
         Examples:
           gem-guardian verify
-        gem-guardian verify sidekiq:8.0.8
+        gem-guardian verify sidekiq:8.1.6
+        gem-guardian verify cdc-sidekiq:0.1.1
         gem-guardian verify nokogiri:1.18.9:x86_64-linux
-        gem-guardian verify --json --provenance
+        gem-guardian verify --json --provenance ratomic:0.4.1
       USAGE
 
       private

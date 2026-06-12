@@ -99,6 +99,82 @@ module Gem
 
         assert_match(/Could not fetch/, error.message)
       end
+
+      def test_trusted_publishing_provenance_parses_known_fields
+        http = FakeHTTP.new(
+          "/api/v1/versions/rake.json" => SuccessResponse.new(
+            JSON.dump([
+                        {
+                          "number" => "13.2.1",
+                          "platform" => "",
+                          "trusted_publishing" => true,
+                          "provenance" => {
+                            "repository" => "https://github.com/ruby/rake",
+                            "ref" => "refs/tags/v13.2.1",
+                            "workflow" => "release.yml",
+                            "issuer" => "https://token.actions.githubusercontent.com",
+                            "subject" => "repo:ruby/rake:ref:refs/tags/v13.2.1",
+                            "sha256" => "D" * 64,
+                            "attestation_url" => "https://rubygems.org"
+                          }
+                        }
+                      ])
+          )
+        )
+
+        client = RubygemsClient.new(http:)
+        provenance = client.trusted_publishing_provenance(Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"))
+
+        refute_nil provenance
+        assert_equal true, provenance.trusted_publishing
+        assert_equal "https://github.com/ruby/rake", provenance.repository
+        assert_equal "refs/tags/v13.2.1", provenance.ref
+        assert_equal "release.yml", provenance.workflow
+        assert_equal "https://token.actions.githubusercontent.com", provenance.issuer
+        assert_equal "repo:ruby/rake:ref:refs/tags/v13.2.1", provenance.subject
+        assert_equal "d" * 64, provenance.sha256.downcase
+        assert_equal "https://rubygems.org", provenance.attestation_url
+      end
+
+      def test_trusted_publishing_provenance_returns_nil_for_empty_untrusted_payload
+        http = FakeHTTP.new(
+          "/api/v1/versions/rake.json" => SuccessResponse.new(
+            JSON.dump([
+                        {
+                          "number" => "13.2.1",
+                          "platform" => "",
+                          "provenance" => {}
+                        }
+                      ])
+          )
+        )
+
+        client = RubygemsClient.new(http:)
+
+        assert_nil client.trusted_publishing_provenance(Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"))
+      end
+
+      def test_trusted_publishing_provenance_handles_non_hash_payloads
+        http = FakeHTTP.new(
+          "/api/v1/versions/rake.json" => SuccessResponse.new(
+            JSON.dump([
+                        {
+                          "number" => "13.2.1",
+                          "platform" => "",
+                          "trusted_publishing" => true,
+                          "provenance" => "signed"
+                        }
+                      ])
+          )
+        )
+
+        client = RubygemsClient.new(http:)
+        provenance = client.trusted_publishing_provenance(Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"))
+
+        refute_nil provenance
+        assert_equal true, provenance.trusted_publishing
+        assert_nil provenance.repository
+      end
     end
   end
 end

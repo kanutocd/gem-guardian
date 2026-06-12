@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 require_relative "../../test_helper"
 
 module Gem
@@ -13,6 +15,11 @@ module Gem
           status == :ok
         end
       end
+
+      FakeProvenanceResult = Data.define(
+        :dependency, :status, :trusted_publishing, :repository, :ref, :workflow, :issuer, :subject,
+        :expected_sha256, :actual_sha256, :error, :attestation_url
+      )
 
       class FakeVerifier
         attr_reader :expected_checksums
@@ -31,6 +38,29 @@ module Gem
               status: :ok,
               error: nil,
               checksum_source: expected_checksums.key?(dependency) ? :lockfile : :rubygems
+            )
+          end
+        end
+      end
+
+      class FakeProvenanceVerifier
+        def initialize(_client = nil); end
+
+        def verify_all(results)
+          results.map do |result|
+            FakeProvenanceResult.new(
+              dependency: result.dependency,
+              status: :verified,
+              trusted_publishing: true,
+              repository: "https://github.com/kanutocd/gem-guardian",
+              ref: "refs/tags/v0.1.1",
+              workflow: "release.yml",
+              issuer: "https://token.actions.githubusercontent.com",
+              subject: "repo:kanutocd/gem-guardian:ref:refs/tags/v0.1.1",
+              expected_sha256: result.actual_sha256,
+              actual_sha256: result.actual_sha256,
+              error: nil,
+              attestation_url: "https://rubygems.org"
             )
           end
         end
@@ -276,6 +306,182 @@ module Gem
         assert_equal 0, status
         assert_match(/PASS rake 13.2.1 ruby/, stdout.string)
         refute_match(/FALLBACK/, stdout.string)
+      end
+
+      def test_verify_can_emit_json_reports
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--json"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: FakeLockfileParser
+        ).run
+
+        report = JSON.parse(stdout.string)
+
+        assert_equal 0, status
+        assert_equal "verify", report["command"]
+        assert_equal "0.1.1", report["version"]
+        assert_equal "lockfile", report["mode"]
+        assert_equal 1, report.dig("checksums", "coverage", "total")
+        assert_equal "rake", report.dig("results", 0, "name")
+        assert_equal "ok", report.dig("results", 0, "checksum", "status")
+      end
+
+      def test_verify_can_emit_json_for_explicit_specs
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--json", "rake:13.2.1"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: FakeLockfileParser
+        ).run
+
+        report = JSON.parse(stdout.string)
+
+        assert_equal 0, status
+        assert_equal "explicit", report["mode"]
+        assert_nil report["checksums"]
+        assert_equal "rake", report.dig("results", 0, "name")
+      end
+
+      def test_verify_can_emit_provenance_results
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--provenance"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: FakeLockfileParser,
+          provenance_verifier_class: FakeProvenanceVerifier
+        ).run
+
+        assert_equal 0, status
+        assert_match(/PROVENANCE PASS rake 13.2.1 ruby/, stdout.string)
+        assert_match(/source trusted-publishing/, stdout.string)
+      end
+
+      def test_verify_can_emit_json_provenance_results
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--json", "--provenance"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: FakeLockfileParser,
+          provenance_verifier_class: FakeProvenanceVerifier
+        ).run
+
+        report = JSON.parse(stdout.string)
+
+        assert_equal 0, status
+        assert_equal "verified", report.dig("results", 0, "provenance", "status")
+        assert_equal true, report.dig("results", 0, "provenance", "trusted_publishing")
+      end
+
+      def test_verify_reports_mixed_provenance_statuses
+        provenance_verifier_class = Class.new do
+          define_method(:initialize) { |_client = nil| }
+
+          define_method(:verify_all) do |results|
+            [
+              FakeProvenanceResult.new(
+                dependency: results[0].dependency,
+                status: :verified,
+                trusted_publishing: true,
+                repository: "https://github.com/kanutocd/gem-guardian",
+                ref: "refs/tags/v0.1.1",
+                workflow: nil,
+                issuer: "https://token.actions.githubusercontent.com",
+                subject: "repo:kanutocd/gem-guardian:ref:refs/tags/v0.1.1",
+                expected_sha256: results[0].actual_sha256,
+                actual_sha256: results[0].actual_sha256,
+                error: nil,
+                attestation_url: "https://rubygems.org"
+              ),
+              FakeProvenanceResult.new(
+                dependency: results[1].dependency,
+                status: :mismatch,
+                trusted_publishing: true,
+                repository: "https://github.com/kanutocd/gem-guardian",
+                ref: "refs/tags/v0.1.1",
+                workflow: "release.yml",
+                issuer: "https://token.actions.githubusercontent.com",
+                subject: "repo:kanutocd/gem-guardian:ref:refs/tags/v0.1.1",
+                expected_sha256: "a" * 64,
+                actual_sha256: "b" * 64,
+                error: nil,
+                attestation_url: "https://rubygems.org"
+              ),
+              FakeProvenanceResult.new(
+                dependency: results[2].dependency,
+                status: :unsupported,
+                trusted_publishing: nil,
+                repository: nil,
+                ref: nil,
+                workflow: nil,
+                issuer: nil,
+                subject: nil,
+                expected_sha256: nil,
+                actual_sha256: nil,
+                error: nil,
+                attestation_url: nil
+              )
+            ]
+          end
+        end
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--provenance", "rake:13.2.1", "rake:13.2.1", "rake:13.2.1"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          provenance_verifier_class: provenance_verifier_class,
+          lockfile_parser_class: FakeLockfileParser
+        ).run
+
+        assert_equal 1, status
+        assert_match(/PROVENANCE PASS rake 13.2.1 ruby/, stdout.string)
+        assert_match(/PROVENANCE FAIL rake 13.2.1 ruby/, stdout.string)
+        assert_match(/PROVENANCE UNSUPPORTED rake 13.2.1 ruby/, stdout.string)
+      end
+
+      def test_verify_can_emit_json_provenance_errors
+        provenance_verifier_class = Class.new do
+          define_method(:initialize) { |_client = nil| }
+
+          define_method(:verify_all) do |results|
+            [
+              FakeProvenanceResult.new(
+                dependency: results.first.dependency,
+                status: :error,
+                trusted_publishing: true,
+                repository: nil,
+                ref: nil,
+                workflow: nil,
+                issuer: nil,
+                subject: nil,
+                expected_sha256: nil,
+                actual_sha256: results.first.actual_sha256,
+                error: RuntimeError.new("boom"),
+                attestation_url: nil
+              )
+            ]
+          end
+        end
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--json", "--provenance", "rake:13.2.1"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          provenance_verifier_class: provenance_verifier_class,
+          lockfile_parser_class: FakeLockfileParser
+        ).run
+
+        report = JSON.parse(stdout.string)
+
+        assert_equal 1, status
+        assert_equal "error", report.dig("results", 0, "provenance", "status")
+        assert_equal "RuntimeError", report.dig("results", 0, "provenance", "error", "class")
       end
     end
   end
