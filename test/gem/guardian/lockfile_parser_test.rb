@@ -16,15 +16,47 @@ module Gem
                 nokogiri (1.18.9-x86_64-linux)
                   racc (~> 1.4)
 
+            CHECKSUMS
+              rake (13.2.1) sha256=#{'a' * 64}
+              nokogiri (1.18.9-x86_64-linux) sha256=#{'b' * 64}
+
             PLATFORMS
               x86_64-linux
           LOCK
 
-          deps = LockfileParser.new(path).dependencies
+          lockfile = LockfileParser.new(path).parse
 
-          assert_equal 2, deps.size
-          assert_equal Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"), deps[0]
-          assert_equal Dependency.new(name: "nokogiri", version: "1.18.9", platform: "x86_64-linux"), deps[1]
+          assert_equal 2, lockfile.dependencies.size
+          assert_equal Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"), lockfile.dependencies[0]
+          assert_equal Dependency.new(name: "nokogiri", version: "1.18.9", platform: "x86_64-linux"), lockfile.dependencies[1]
+          assert_equal "a" * 64, lockfile.checksum_for(lockfile.dependencies[0])
+          assert_equal "b" * 64, lockfile.checksum_for(lockfile.dependencies[1])
+          assert_equal [], lockfile.missing_checksum_dependencies
+        end
+      end
+
+      def test_reports_missing_checksums
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "Gemfile.lock")
+          File.write(path, <<~LOCK)
+            GEM
+              remote: https://rubygems.org/
+              specs:
+                rake (13.2.1)
+                nokogiri (1.18.9-x86_64-linux)
+
+            CHECKSUMS
+              rake (13.2.1) sha256=#{'a' * 64}
+
+            PLATFORMS
+              x86_64-linux
+          LOCK
+
+          lockfile = LockfileParser.new(path).parse
+
+          assert_equal 2, lockfile.dependencies.size
+          assert_equal 1, lockfile.missing_checksum_dependencies.size
+          assert_equal Dependency.new(name: "nokogiri", version: "1.18.9", platform: "x86_64-linux"), lockfile.missing_checksum_dependencies.first
         end
       end
 
