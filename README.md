@@ -39,6 +39,27 @@ gem install ./gem-guardian-0.1.0.gem
 
 ## Usage
 
+Build and install the current release from a local checkout:
+
+```bash
+gem build gem-guardian.gemspec
+gem install ./gem-guardian-0.1.1.gem
+gem-guardian version
+```
+
+Show the built-in help:
+
+```bash
+gem-guardian help
+gem-guardian --help
+```
+
+Prepare a locked project for checksum auditing:
+
+```bash
+bundle lock --add-checksums
+```
+
 Verify all gems in `Gemfile.lock`:
 
 ```bash
@@ -63,6 +84,8 @@ Use a non-default lockfile:
 ```bash
 gem-guardian verify --lockfile path/to/Gemfile.lock
 ```
+
+When you verify a lockfile that already contains Bundler `CHECKSUMS`, `gem-guardian` reports coverage and compares the locked checksum to the downloaded artifact. When a checksum is missing, it falls back to RubyGems.org metadata and marks that verification accordingly.
 
 ## Exit codes
 
