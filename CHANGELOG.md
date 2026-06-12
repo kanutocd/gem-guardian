@@ -1,5 +1,19 @@
+# Changelog
+
 ## [Unreleased]
+
+## [0.1.1] - 2026-06-12
+
+- Parse Bundler `CHECKSUMS` entries from `Gemfile.lock`.
+- Audit lockfiles for missing checksum coverage and report fallback verification.
+- Raise test coverage to 95%+ line and branch.
+- Curate `sig/` outputs so `rbs validate` passes cleanly.
+- Add GitHub Actions Ruby matrix for `3.2`, `3.3`, `3.4`, and `4.0`.
+- Run `rbs:validate` in CI.
 
 ## [0.1.0] - 2026-06-12
 
-- Initial release
+- Initial MVP codebase.
+- Verify explicit gems or all gems in `Gemfile.lock`.
+- Fetch expected SHA256 checksums from RubyGems.org versions API.
+- Fetch `.gem` artifacts from RubyGems.org and verify SHA256 locally.
