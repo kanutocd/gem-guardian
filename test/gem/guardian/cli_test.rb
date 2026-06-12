@@ -321,7 +321,7 @@ module Gem
 
         assert_equal 0, status
         assert_equal "verify", report["command"]
-        assert_equal "0.1.1", report["version"]
+        assert_equal "0.2.0", report["version"]
         assert_equal "lockfile", report["mode"]
         assert_equal 1, report.dig("checksums", "coverage", "total")
         assert_equal "rake", report.dig("results", 0, "name")
