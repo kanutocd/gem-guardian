@@ -7,10 +7,12 @@ module Gem
         new(argv).run
       end
 
-      def initialize(argv, stdout: $stdout, stderr: $stderr)
+      def initialize(argv, stdout: $stdout, stderr: $stderr, verifier_class: Verifier, lockfile_parser_class: LockfileParser)
         @argv = argv.dup
         @stdout = stdout
         @stderr = stderr
+        @verifier_class = verifier_class
+        @lockfile_parser_class = lockfile_parser_class
       end
 
       def run
@@ -36,8 +38,10 @@ module Gem
       def verify
         lockfile = option_value("--lockfile") || "Gemfile.lock"
         gems = @argv
+        lockfile_data = nil
         dependencies = if gems.empty?
-                         LockfileParser.new(lockfile).dependencies
+                         lockfile_data = @lockfile_parser_class.new(lockfile).parse
+                         lockfile_data.dependencies
                        else
                          gems.map { |spec| parse_gem_spec(spec) }
                        end
@@ -47,9 +51,15 @@ module Gem
           return 1
         end
 
-        results = Verifier.new.verify_all(dependencies)
-        print_results(results)
-        results.all?(&:ok?) ? 0 : 1
+        results = @verifier_class.new(expected_checksums: lockfile_data&.sha256_checksums || {}).verify_all(dependencies)
+        print_results(results, lockfile_mode: !lockfile_data.nil?)
+        if lockfile_data
+          print_lockfile_coverage(lockfile_data)
+        end
+
+        all_ok = results.all?(&:ok?)
+        all_covered = lockfile_data.nil? || lockfile_data.missing_checksum_dependencies.empty?
+        all_ok && all_covered ? 0 : 1
       rescue Error => e
         @stderr.puts e.message
         1
@@ -73,14 +83,16 @@ module Gem
         value
       end
 
-      def print_results(results)
+      def print_results(results, lockfile_mode:)
         results.each do |result|
           dependency = result.dependency
           label = "#{dependency.name} #{dependency.version} #{dependency.platform}"
           case result.status
           when :ok
-            @stdout.puts "PASS #{label}"
+            prefix = lockfile_mode && result.checksum_source == :rubygems ? "FALLBACK" : "PASS"
+            @stdout.puts "#{prefix} #{label}"
             @stdout.puts "     sha256 #{result.actual_sha256}"
+            @stdout.puts "     source #{result.checksum_source}" if lockfile_mode && result.checksum_source
           when :mismatch
             @stdout.puts "FAIL #{label}"
             @stdout.puts "     expected #{result.expected_sha256}"
@@ -89,6 +101,16 @@ module Gem
             @stdout.puts "ERROR #{label}"
             @stdout.puts "      #{result.error.class}: #{result.error.message}"
           end
+        end
+      end
+
+      def print_lockfile_coverage(lockfile_data)
+        covered = lockfile_data.dependencies.size - lockfile_data.missing_checksum_dependencies.size
+        total = lockfile_data.dependencies.size
+        @stdout.puts "CHECKSUMS coverage: #{covered}/#{total}"
+
+        lockfile_data.missing_checksum_dependencies.each do |dependency|
+          @stdout.puts "MISSING #{dependency.name} #{dependency.version} #{dependency.platform}"
         end
       end
 
