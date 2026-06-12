@@ -3,3 +3,8 @@ module Gem
     VERSION: "0.1.0"
   end
 end
+module Gem
+  module Guardian
+    VERSION: String
+  end
+end

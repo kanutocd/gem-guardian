@@ -11,3 +11,12 @@ module Gem
     end
   end
 end
+module Gem
+  module Guardian
+    class ArtifactStore
+      def initialize: (client: RubygemsClient, ?cache_dir: String) -> void
+
+      def path_for: (Dependency dependency) -> String
+    end
+  end
+end

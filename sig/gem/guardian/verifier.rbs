@@ -19,3 +19,22 @@ module Gem
     end
   end
 end
+module Gem
+  module Guardian
+    VerificationResult: untyped
+
+    class Verifier
+      def initialize: (?client: RubygemsClient, ?artifact_store: ArtifactStore?, ?expected_checksums: ::Hash[Dependency, String]) -> void
+
+      def verify: (Dependency dependency) -> untyped
+
+      def verify_all: (::Array[Dependency] dependencies) -> ::Array[untyped]
+
+      private
+
+      def secure_compare: (String left, String right) -> bool
+
+      def expected_sha256_for: (Dependency dependency) -> ::Array[untyped]
+    end
+  end
+end

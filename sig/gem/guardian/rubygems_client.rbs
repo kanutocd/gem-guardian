@@ -23,3 +23,24 @@ module Gem
     end
   end
 end
+module Gem
+  module Guardian
+    class RubygemsClient
+      DEFAULT_HOST: String
+
+      def initialize: (?host: String, ?http: untyped) -> void
+
+      def expected_sha256: (Dependency dependency) -> String
+
+      def download_gem: (Dependency dependency, String destination) -> String
+
+      private
+
+      def get: (String path) -> String
+
+      def platform_matches?: (untyped remote_platform, untyped wanted_platform) -> bool
+
+      def blank?: (untyped value) -> bool
+    end
+  end
+end

@@ -17,3 +17,39 @@ module Gem
     end
   end
 end
+module Gem
+  module Guardian
+    class LockfileParser
+      GEM_LINE: ::Regexp
+      CHECKSUM_LINE: ::Regexp
+
+      class LockfileData
+        attr_reader dependencies: ::Array[Dependency]
+
+        attr_reader checksums: ::Hash[Dependency, ::Hash[String, String]]
+
+        attr_reader checksums_section_present: bool
+
+        def checksum_for: (Dependency dependency, ?String algorithm) -> String?
+
+        def sha256_checksums: () -> ::Hash[Dependency, String]
+
+        def missing_checksum_dependencies: () -> ::Array[Dependency]
+
+        def checksums_present?: () -> bool
+      end
+
+      def initialize: (?String path) -> void
+
+      def parse: () -> LockfileData
+
+      def dependencies: () -> ::Array[Dependency]
+
+      def checksums: () -> ::Hash[Dependency, ::Hash[String, String]]
+
+      private
+
+      def split_version_and_platform: (String value) -> ::Array[String]
+    end
+  end
+end

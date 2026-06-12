@@ -27,3 +27,34 @@ module Gem
     end
   end
 end
+module Gem
+  module Guardian
+    class CLI
+      @argv: untyped
+
+      @stdout: untyped
+
+      @stderr: untyped
+
+      def self.start: (untyped argv) -> untyped
+
+      def initialize: (untyped argv, ?stdout: untyped, ?stderr: untyped, ?verifier_class: untyped, ?lockfile_parser_class: untyped) -> void
+
+      def run: () -> untyped
+
+      private
+
+      def verify: () -> untyped
+
+      def parse_gem_spec: (String spec) -> Dependency
+
+      def option_value: (String name) -> (String?)
+
+      def print_results: (untyped results, lockfile_mode: bool) -> void
+
+      def print_lockfile_coverage: (untyped lockfile_data) -> void
+
+      def usage: (?untyped io) -> void
+    end
+  end
+end
