@@ -18,12 +18,8 @@ module Gem
 
       # Returns the expected SHA256 checksum for +dependency+.
       def expected_sha256(dependency)
-        versions = JSON.parse(get("/api/v1/versions/#{dependency.name}.json"))
-        version = versions.find do |item|
-          item["number"] == dependency.version && platform_matches?(item["platform"], dependency.platform)
-        end
-
-        sha = version && (version["sha"] || version["sha256"] || version["checksum"])
+        version = matching_version(dependency)
+        sha = version && version_checksum(version)
         if blank?(sha)
           raise ChecksumNotFound,
                 "No SHA256 found for #{dependency.name} #{dependency.version} #{dependency.platform}"
@@ -42,6 +38,17 @@ module Gem
       end
 
       private
+
+      def matching_version(dependency)
+        versions = JSON.parse(get("/api/v1/versions/#{dependency.name}.json"))
+        versions.find do |item|
+          item["number"] == dependency.version && platform_matches?(item["platform"], dependency.platform)
+        end
+      end
+
+      def version_checksum(version)
+        version["sha"] || version["sha256"] || version["checksum"]
+      end
 
       # GETs +path+ from the configured host and returns the response body.
       def get(path)

@@ -22,29 +22,9 @@ module Gem
       # Verifies one dependency and returns a VerificationResult.
       def verify(dependency)
         expected, checksum_source = expected_sha256_for(dependency)
-        artifact_path = @artifact_store.path_for(dependency)
-        actual = Checksum.sha256_file(artifact_path)
-        status = secure_compare(expected, actual) ? :ok : :mismatch
-
-        VerificationResult.new(
-          dependency:,
-          expected_sha256: expected,
-          actual_sha256: actual,
-          artifact_path:,
-          status:,
-          error: nil,
-          checksum_source:
-        )
+        build_verification_result(dependency, expected, checksum_source)
       rescue StandardError => e
-        VerificationResult.new(
-          dependency:,
-          expected_sha256: nil,
-          actual_sha256: nil,
-          artifact_path: nil,
-          status: :error,
-          error: e,
-          checksum_source: nil
-        )
+        build_error_result(dependency, e)
       end
 
       # Verifies each dependency in +dependencies+.
@@ -53,6 +33,30 @@ module Gem
       end
 
       private
+
+      def build_verification_result(dependency, expected, checksum_source)
+        VerificationResult.new(**verification_attributes(dependency, expected, checksum_source))
+      end
+
+      def build_error_result(dependency, error)
+        VerificationResult.new(
+          dependency:,
+          expected_sha256: nil,
+          actual_sha256: nil,
+          artifact_path: nil,
+          status: :error,
+          error:,
+          checksum_source: nil
+        )
+      end
+
+      def verification_attributes(dependency, expected, checksum_source)
+        artifact_path = @artifact_store.path_for(dependency)
+        actual = Checksum.sha256_file(artifact_path)
+        { dependency:, expected_sha256: expected, actual_sha256: actual, artifact_path:,
+          status: secure_compare(expected, actual) ? :ok : :mismatch, error: nil,
+          checksum_source: }
+      end
 
       # Constant-time comparison for checksum strings.
       def secure_compare(left, right)

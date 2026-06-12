@@ -47,44 +47,9 @@ module Gem
         section = nil
 
         File.readlines(@path, chomp: true).each do |line|
-          case line
-          when "  specs:"
-            section = :specs
-            next
-          when "CHECKSUMS"
-            section = :checksums
-            next
-          when /^[A-Z]/
-            section = nil
-            next
-          end
-
-          case section
-          when :specs
-            match = GEM_LINE.match(line)
-            next unless match
-
-            name = match[1]
-            version_and_platform = match[2]
-            version, platform = split_version_and_platform(version_and_platform)
-            dependencies << Dependency.new(name:, version:, platform:)
-          when :checksums
-            match = CHECKSUM_LINE.match(line)
-            next unless match
-
-            name = match[1]
-            version_and_platform = match[2]
-            checksum_blob = match[3]
-            version, platform = split_version_and_platform(version_and_platform)
-            dependency = Dependency.new(name:, version:, platform:)
-            checksums[dependency] ||= {}
-            checksum_blob.split(",").each do |pair|
-              algorithm, digest = pair.split("=", 2).map(&:strip)
-              next if algorithm.to_s.empty? || digest.to_s.empty?
-
-              checksums[dependency][algorithm] = digest
-            end
-          end
+          section = section_for(line, section)
+          parse_specs_line(line, dependencies) if section == :specs
+          parse_checksums_line(line, checksums) if section == :checksums
         end
 
         LockfileData.new(dependencies, checksums, checksums.any?)
@@ -101,6 +66,51 @@ module Gem
       end
 
       private
+
+      def section_for(line, current_section)
+        case line
+        when "  specs:"
+          :specs
+        when "CHECKSUMS"
+          :checksums
+        when /^[A-Z]/
+          nil
+        else
+          current_section
+        end
+      end
+
+      def parse_specs_line(line, dependencies)
+        match = GEM_LINE.match(line)
+        return unless match
+
+        name = match[1]
+        version_and_platform = match[2]
+        version, platform = split_version_and_platform(version_and_platform)
+        dependencies << Dependency.new(name:, version:, platform:)
+      end
+
+      def parse_checksums_line(line, checksums)
+        match = CHECKSUM_LINE.match(line)
+        return unless match
+
+        name = match[1]
+        version_and_platform = match[2]
+        checksum_blob = match[3]
+        version, platform = split_version_and_platform(version_and_platform)
+        dependency = Dependency.new(name:, version:, platform:)
+        checksums[dependency] ||= {}
+        register_checksum_pairs(checksums[dependency], checksum_blob)
+      end
+
+      def register_checksum_pairs(checksum_store, checksum_blob)
+        checksum_blob.split(",").each do |pair|
+          algorithm, digest = pair.split("=", 2).map(&:strip)
+          next if algorithm.to_s.empty? || digest.to_s.empty?
+
+          checksum_store[algorithm] = digest
+        end
+      end
 
       # Bundler renders native platforms as `1.2.3-x86_64-linux` in the spec line.
       # Ruby versions remain plain, for example `1.2.3`.

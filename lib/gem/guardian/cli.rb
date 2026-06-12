@@ -5,7 +5,6 @@ module Gem
   # Command-line interface and output helpers.
   module Guardian
     # Command-line entry point for gem-guardian.
-    # rubocop:disable Metrics/ClassLength
     class CLI
       # Starts the CLI with the provided argv.
       def self.start(argv)
@@ -19,53 +18,34 @@ module Gem
         @stderr = stderr
         @verifier_class = verifier_class
         @lockfile_parser_class = lockfile_parser_class
+        @result_printer = ResultPrinter.new(stdout:)
       end
 
       # Dispatches the requested subcommand and returns an exit status.
       def run
-        command = @argv.shift
-        case command
-        when "verify"
-          verify
-        when "version", "--version", "-v"
-          @stdout.puts VERSION
-          0
-        when "help", "--help", "-h", nil
-          usage
-          0
-        else
-          @stderr.puts "Unknown command: #{command}"
-          usage(@stderr)
-          2
-        end
+        dispatch(@argv.shift)
       end
 
       private
 
+      def dispatch(command)
+        case command
+        when "verify" then verify
+        when "version", "--version", "-v" then print_version
+        when "help", "--help", "-h", nil then usage
+        else
+          unknown_command(command)
+        end
+      end
+
       # Runs the verify subcommand.
       def verify
-        lockfile = option_value("--lockfile") || "Gemfile.lock"
-        gems = @argv
-        lockfile_data = nil
-        dependencies = if gems.empty?
-                         lockfile_data = @lockfile_parser_class.new(lockfile).parse
-                         lockfile_data.dependencies
-                       else
-                         gems.map { |spec| parse_gem_spec(spec) }
-                       end
+        lockfile_data, dependencies = resolve_dependencies
+        return no_dependencies if dependencies.empty?
 
-        if dependencies.empty?
-          @stderr.puts "No gems found to verify."
-          return 1
-        end
-
-        results = @verifier_class.new(expected_checksums: lockfile_data&.sha256_checksums || {}).verify_all(dependencies)
-        print_results(results, lockfile_mode: !lockfile_data.nil?)
-        print_lockfile_coverage(lockfile_data) if lockfile_data
-
-        all_ok = results.all?(&:ok?)
-        all_covered = lockfile_data.nil? || lockfile_data.missing_checksum_dependencies.empty?
-        all_ok && all_covered ? 0 : 1
+        results = verifier_for(lockfile_data).verify_all(dependencies)
+        print_verification_report(results, lockfile_data)
+        verification_exit_status(results, lockfile_data)
       rescue Error => e
         @stderr.puts e.message
         1
@@ -77,6 +57,49 @@ module Gem
         raise Error, "Expected GEM:VERSION[:PLATFORM], got: #{spec}" if name.to_s.empty? || version.to_s.empty?
 
         Dependency.new(name:, version:, platform: platform || "ruby")
+      end
+
+      def resolve_dependencies
+        lockfile = option_value("--lockfile") || "Gemfile.lock"
+        return [nil, @argv.map { |spec| parse_gem_spec(spec) }] unless @argv.empty?
+
+        lockfile_data = @lockfile_parser_class.new(lockfile).parse
+        [lockfile_data, lockfile_data.dependencies]
+      end
+
+      def verifier_for(lockfile_data)
+        expected_checksums = lockfile_data&.sha256_checksums || {}
+        @verifier_class.new(expected_checksums:)
+      end
+
+      def print_verification_report(results, lockfile_data)
+        lockfile_mode = !lockfile_data.nil?
+        @result_printer.print_results(results, lockfile_mode:)
+        return unless lockfile_data
+
+        @result_printer.print_lockfile_coverage(lockfile_data)
+      end
+
+      def verification_exit_status(results, lockfile_data)
+        all_ok = results.all?(&:ok?)
+        all_covered = lockfile_data.nil? || lockfile_data.missing_checksum_dependencies.empty?
+        all_ok && all_covered ? 0 : 1
+      end
+
+      def no_dependencies
+        @stderr.puts "No gems found to verify."
+        1
+      end
+
+      def print_version
+        @stdout.puts VERSION
+        0
+      end
+
+      def unknown_command(command)
+        @stderr.puts "Unknown command: #{command}"
+        usage(@stderr)
+        2
       end
 
       # Returns and removes an option value from argv.
@@ -91,56 +114,11 @@ module Gem
         value
       end
 
-      # Prints verification results in a concise human-readable format.
-      def print_results(results, lockfile_mode:)
-        results.each do |result|
-          dependency = result.dependency
-          label = "#{dependency.name} #{dependency.version} #{dependency.platform}"
-          case result.status
-          when :ok
-            prefix = lockfile_mode && result.checksum_source == :rubygems ? "FALLBACK" : "PASS"
-            @stdout.puts "#{prefix} #{label}"
-            @stdout.puts "     sha256 #{result.actual_sha256}"
-            @stdout.puts "     source #{result.checksum_source}" if lockfile_mode && result.checksum_source
-          when :mismatch
-            @stdout.puts "FAIL #{label}"
-            @stdout.puts "     expected #{result.expected_sha256}"
-            @stdout.puts "     actual   #{result.actual_sha256}"
-          else
-            @stdout.puts "ERROR #{label}"
-            @stdout.puts "      #{result.error.class}: #{result.error.message}"
-          end
-        end
-      end
-
-      # Prints lockfile checksum coverage information.
-      def print_lockfile_coverage(lockfile_data)
-        covered = lockfile_data.dependencies.size - lockfile_data.missing_checksum_dependencies.size
-        total = lockfile_data.dependencies.size
-        @stdout.puts "CHECKSUMS coverage: #{covered}/#{total}"
-
-        lockfile_data.missing_checksum_dependencies.each do |dependency|
-          @stdout.puts "MISSING #{dependency.name} #{dependency.version} #{dependency.platform}"
-        end
-      end
-
       # Prints usage text.
-      def usage(io = @stdout)
-        io.puts <<~USAGE
-          gem-guardian #{VERSION}
-
-          Usage:
-            gem-guardian verify [--lockfile Gemfile.lock]
-            gem-guardian verify GEM:VERSION[:PLATFORM] [GEM:VERSION[:PLATFORM] ...]
-            gem-guardian version
-
-          Examples:
-            gem-guardian verify
-            gem-guardian verify sidekiq:8.0.8
-            gem-guardian verify nokogiri:1.18.9:x86_64-linux
-        USAGE
+      def usage(_io = @stdout)
+        @result_printer.usage
+        0
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end
