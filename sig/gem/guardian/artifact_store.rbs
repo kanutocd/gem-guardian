@@ -1,0 +1,13 @@
+module Gem
+  module Guardian
+    class ArtifactStore
+      @client: untyped
+
+      @cache_dir: untyped
+
+      def initialize: (client: untyped, ?cache_dir: untyped) -> void
+
+      def path_for: (untyped dependency) -> untyped
+    end
+  end
+end

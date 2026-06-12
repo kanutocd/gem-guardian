@@ -1,0 +1,29 @@
+module Gem
+  module Guardian
+    class CLI
+      @argv: untyped
+
+      @stdout: untyped
+
+      @stderr: untyped
+
+      def self.start: (untyped argv) -> untyped
+
+      def initialize: (untyped argv, ?stdout: untyped, ?stderr: untyped) -> void
+
+      def run: () -> untyped
+
+      private
+
+      def verify: () -> untyped
+
+      def parse_gem_spec: (untyped spec) -> untyped
+
+      def option_value: (untyped name) -> (nil | untyped)
+
+      def print_results: (untyped results) -> untyped
+
+      def usage: (?untyped io) -> untyped
+    end
+  end
+end

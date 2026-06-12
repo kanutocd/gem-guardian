@@ -1,0 +1,21 @@
+module Gem
+  module Guardian
+    VerificationResult: untyped
+
+    class Verifier
+      @client: untyped
+
+      @artifact_store: untyped
+
+      def initialize: (?client: untyped, ?artifact_store: untyped?) -> void
+
+      def verify: (untyped dependency) -> untyped
+
+      def verify_all: (untyped dependencies) -> untyped
+
+      private
+
+      def secure_compare: (untyped left, untyped right) -> (false | untyped)
+    end
+  end
+end

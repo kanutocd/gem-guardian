@@ -1,0 +1,7 @@
+module Gem
+  module Guardian
+    module Checksum
+      def self?.sha256_file: (untyped path) -> untyped
+    end
+  end
+end

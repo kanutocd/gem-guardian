@@ -1,0 +1,11 @@
+module Gem
+  module Guardian
+    Error: untyped
+
+    ChecksumNotFound: untyped
+
+    ArtifactFetchError: untyped
+
+    LockfileError: untyped
+  end
+end

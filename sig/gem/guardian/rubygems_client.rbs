@@ -1,0 +1,25 @@
+module Gem
+  module Guardian
+    class RubygemsClient
+      @host: untyped
+
+      @http: untyped
+
+      DEFAULT_HOST: "https://rubygems.org"
+
+      def initialize: (?host: untyped, ?http: untyped) -> void
+
+      def expected_sha256: (untyped dependency) -> untyped
+
+      def download_gem: (untyped dependency, untyped destination) -> untyped
+
+      private
+
+      def get: (untyped path) -> untyped
+
+      def platform_matches?: (untyped remote_platform, untyped wanted_platform) -> untyped
+
+      def blank?: (untyped value) -> untyped
+    end
+  end
+end

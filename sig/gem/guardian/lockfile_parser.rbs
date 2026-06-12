@@ -1,0 +1,19 @@
+module Gem
+  module Guardian
+    class LockfileParser
+      @path: untyped
+
+      GEM_LINE: ::Regexp
+
+      def initialize: (?::String path) -> void
+
+      def dependencies: () -> untyped
+
+      private
+
+      # Bundler renders native platforms as `1.2.3-x86_64-linux` in the spec line.
+      # Ruby versions remain plain, for example `1.2.3`.
+      def split_version_and_platform: (untyped value) -> ::Array[untyped]
+    end
+  end
+end
