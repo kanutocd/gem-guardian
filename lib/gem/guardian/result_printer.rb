@@ -83,6 +83,7 @@ module Gem
         provenance_fields(result).each do |label_name, value|
           @stdout.puts format_provenance_field(label_name, value) if value
         end
+        print_github_release_result(result.github_release) if result.github_release
       end
 
       # Prints a provenance checksum mismatch.
@@ -138,6 +139,31 @@ module Gem
           ["sha256", result.expected_sha256],
           ["attestation", result.attestation_url]
         ]
+      end
+
+      # Returns the GitHub release fields to render for a provenance result.
+      # rubocop:disable Metrics/MethodLength
+      def github_release_fields(result)
+        [
+          ["github release", result.status],
+          ["release repo", result.repository],
+          ["release tag", result.tag],
+          ["checksum assets", result.checksum_assets.join(", ")],
+          ["signature assets", result.signature_assets.join(", ")],
+          ["signed tag", result.signed_tag],
+          ["tag reason", result.signed_tag_reason],
+          ["attestation", result.release_attestation],
+          ["release url", result.release_url]
+        ]
+      end
+      # rubocop:enable Metrics/MethodLength
+
+      # Prints a GitHub release provenance result.
+      def print_github_release_result(result)
+        @stdout.puts "GITHUB RELEASE #{result.status.to_s.upcase}"
+        github_release_fields(result).each do |label_name, value|
+          @stdout.puts format_provenance_field(label_name, value) if value
+        end
       end
 
       # Formats one provenance field line.

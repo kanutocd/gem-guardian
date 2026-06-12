@@ -5,7 +5,7 @@ module Gem
     # Result object for a provenance verification attempt.
     ProvenanceResult = Data.define(
       :dependency, :status, :trusted_publishing, :repository, :ref, :workflow, :issuer, :subject,
-      :expected_sha256, :actual_sha256, :error, :attestation_url
+      :expected_sha256, :actual_sha256, :error, :attestation_url, :github_release
     ) do
       # Returns true when provenance verification succeeded.
       def verified?
@@ -15,8 +15,9 @@ module Gem
 
     # Verifies RubyGems Trusted Publishing provenance metadata.
     class ProvenanceVerifier
-      def initialize(client: RubygemsClient.new)
+      def initialize(client: RubygemsClient.new, github_release_verifier: GitHubReleaseVerifier.new)
         @client = client
+        @github_release_verifier = github_release_verifier
       end
 
       # Verifies Trusted Publishing provenance for +dependency+.
@@ -38,20 +39,21 @@ module Gem
 
       # rubocop:disable Metrics/MethodLength
       def build_result(dependency, provenance, artifact_sha256)
-        ProvenanceResult.new(**result_attributes(
-          dependency, provenance, artifact_sha256, provenance_status(provenance, artifact_sha256)
-        ))
+        github_release = github_release_result(provenance)
+        status = combine_status(provenance_status(provenance, artifact_sha256), github_release&.status)
+        ProvenanceResult.new(**result_attributes(dependency, provenance, artifact_sha256, status, github_release))
       end
 
       def unsupported_result(dependency)
-        ProvenanceResult.new(**result_attributes(dependency, nil, nil, :unsupported))
+        ProvenanceResult.new(**result_attributes(dependency, nil, nil, :unsupported, nil))
       end
 
       def error_result(dependency, artifact_sha256, error)
-        ProvenanceResult.new(**result_attributes(dependency, nil, artifact_sha256, :error, error))
+        ProvenanceResult.new(**result_attributes(dependency, nil, artifact_sha256, :error, nil, error))
       end
 
-      def result_attributes(dependency, provenance, artifact_sha256, status, error = nil)
+      # rubocop:disable Metrics/ParameterLists
+      def result_attributes(dependency, provenance, artifact_sha256, status, github_release = nil, error = nil)
         {
           dependency:,
           status:,
@@ -64,9 +66,11 @@ module Gem
           expected_sha256: provenance&.sha256,
           actual_sha256: artifact_sha256,
           error:,
-          attestation_url: provenance&.attestation_url
+          attestation_url: provenance&.attestation_url,
+          github_release:
         }
       end
+      # rubocop:enable Metrics/ParameterLists
       # rubocop:enable Metrics/MethodLength
 
       def provenance_status(provenance, artifact_sha256)
@@ -74,6 +78,19 @@ module Gem
         return :verified unless provenance.sha256 && artifact_sha256
 
         secure_compare(provenance.sha256, artifact_sha256) ? :verified : :mismatch
+      end
+
+      def github_release_result(provenance)
+        @github_release_verifier.verify(provenance)
+      rescue StandardError
+        nil
+      end
+
+      def combine_status(provenance_status, github_release_status)
+        return github_release_status if %i[mismatch error].include?(github_release_status)
+        return provenance_status if github_release_status.nil? || github_release_status == :unsupported
+
+        provenance_status == :unsupported ? github_release_status : provenance_status
       end
 
       def secure_compare(left, right)

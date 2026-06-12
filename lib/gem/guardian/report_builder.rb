@@ -55,7 +55,8 @@ module Gem
 
       def provenance_hash(result)
         provenance_fields(result).merge(
-          error: error_hash(result.error)
+          error: error_hash(result.error),
+          github_release: github_release_hash(result.github_release)
         )
       end
 
@@ -73,6 +74,26 @@ module Gem
           expected_sha256: result.expected_sha256,
           actual_sha256: result.actual_sha256,
           attestation_url: result.attestation_url
+        }
+      end
+      # rubocop:enable Metrics/MethodLength
+
+      # Returns the GitHub release details for a provenance result.
+      # rubocop:disable Metrics/MethodLength
+      def github_release_hash(result)
+        return nil unless result
+
+        {
+          status: result.status,
+          repository: result.repository,
+          tag: result.tag,
+          checksum_assets: result.checksum_assets,
+          signature_assets: result.signature_assets,
+          signed_tag: result.signed_tag,
+          signed_tag_reason: result.signed_tag_reason,
+          release_attestation: result.release_attestation,
+          release_url: result.release_url,
+          error: error_hash(result.error)
         }
       end
       # rubocop:enable Metrics/MethodLength
