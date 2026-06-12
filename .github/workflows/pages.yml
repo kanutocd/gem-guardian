@@ -28,7 +28,7 @@ jobs:
           bundler-cache: true
 
       - name: Build YARD documentation
-        run: bundle exec rake yard
+        run: bundle exec yard doc
 
       - name: Enforce YARD coverage
         shell: bash
