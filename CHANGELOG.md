@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Discover GitHub Release checksum and signature assets.
+- Verify signed Git tags and GitHub release attestations when provenance exposes a GitHub tag.
+
 ## [0.2.0] - 2026-06-12
 
 - Add `--json` output for CI-friendly verification reports.

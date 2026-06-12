@@ -24,7 +24,9 @@ Gem::Specification.new do |spec|
   }
 
   spec.files = Dir.chdir(__dir__) do
-    `git ls-files -z`.split("\x0").reject do |f|
+    tracked_files = `git ls-files -z`.split("\x0")
+    source_files = Dir["lib/**/*", "exe/*", "README.md", "LICENSE.txt", "CHANGELOG.md"]
+    (tracked_files + source_files).uniq.reject do |f|
       f.match(%r{\A(?:test|spec|features)/})
     end
   rescue StandardError

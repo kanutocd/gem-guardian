@@ -8,7 +8,7 @@
 
 Consumer-side integrity verification for Ruby gems.
 
-`gem-guardian` audits Bundler checksum coverage, verifies `.gem` artifacts against RubyGems SHA256 data when needed, and can verify Trusted Publishing provenance for supported releases. It stays intentionally small: no Bundler monkeypatching, no install hooks, and no custom publishing flow required.
+`gem-guardian` audits Bundler checksum coverage, verifies `.gem` artifacts against RubyGems SHA256 data when needed, and can verify Trusted Publishing provenance for supported releases, including GitHub release checksum/signature discovery and signed-tag attestation checks when the release data exposes them. It stays intentionally small: no Bundler monkeypatching, no install hooks, and no custom publishing flow required.
 
 ## Why
 
@@ -28,7 +28,7 @@ Trusted Publishing provenance verification when available
 Actionable report for CI or local review
 ```
 
-This reports whether your lockfile is using Bundler checksum protection, whether any locked gems are missing expected checksum data, and whether RubyGems exposes Trusted Publishing provenance for the gem being verified. It does **not** yet prove source provenance for releases that do not publish attestation data.
+This reports whether your lockfile is using Bundler checksum protection, whether any locked gems are missing expected checksum data, whether RubyGems exposes Trusted Publishing provenance for the gem being verified, and whether GitHub release assets and tag attestations are available for the release being inspected.
 
 ## Installation
 
@@ -111,12 +111,11 @@ Use `--provenance` to inspect Trusted Publishing metadata when RubyGems exposes 
 - Downloads artifacts from RubyGems.org `/downloads/<gem-file>.gem` only when verification is needed.
 - Caches downloaded artifacts under the system temp directory.
 - Does not integrate into Bundler install hooks.
-- Does not yet verify Sigstore, SLSA, GitHub Actions provenance, or signed git tags.
+- GitHub Release checksum/signature discovery and signed tag/release attestation checks are supported when the release metadata is available.
 
 ## Roadmap
 
-- GitHub Release checksum/signature discovery.
-- Signed tag and release attestation checks.
+- Expand release provenance checks to additional publishing workflows beyond GitHub release provenance.
 
 
 ## License
