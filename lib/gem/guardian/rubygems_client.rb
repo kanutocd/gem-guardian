@@ -15,10 +15,15 @@ module Gem
         :trusted_publishing, :repository, :ref, :workflow, :issuer, :subject, :sha256, :attestation_url
       )
 
+      # Matches the `Source Commit` field on the RubyGems provenance page.
       SOURCE_COMMIT_PATTERN = %r{Source Commit\s+([A-Za-z0-9._/-]+@[A-Za-z0-9._-]+)}i
+      # Matches the `Build File` field on the RubyGems provenance page.
       BUILD_FILE_PATTERN = /Build File\s+([^\s]+)/i
+      # Matches the transparency log URL shown on the RubyGems provenance page.
       LOG_ENTRY_PATTERN = %r{transparency log entry\s*(https?://[^\s]+)}i
+      # Matches the SHA256 checksum shown on the RubyGems provenance page.
       SHA256_PATTERN = /SHA 256 checksum\s*([a-f0-9]{64})/i
+      # Matches the provenance workflow label shown on the RubyGems provenance page.
       WORKFLOW_PATTERN = /
         Built and signed on\s+
         ([A-Za-z0-9 ._-]+?)
