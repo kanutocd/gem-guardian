@@ -4,16 +4,19 @@ module Gem
   module Guardian
     # Formats verification results for human-readable CLI output.
     class ResultPrinter
+      # @param stdout [IO] output stream for formatted messages
       def initialize(stdout:)
         @stdout = stdout
       end
 
+      # Prints a collection of verification results.
       def print_results(results, lockfile_mode:)
         results.each do |result|
           print_result(result, lockfile_mode:)
         end
       end
 
+      # Prints one verification result.
       def print_result(result, lockfile_mode:)
         label = result_label(result)
         case result.status
@@ -23,6 +26,7 @@ module Gem
         end
       end
 
+      # Prints a successful verification result.
       def print_ok_result(result, label, lockfile_mode)
         prefix = lockfile_mode && result.checksum_source == :rubygems ? "FALLBACK" : "PASS"
         @stdout.puts "#{prefix} #{label}"
@@ -30,17 +34,20 @@ module Gem
         @stdout.puts "     source #{result.checksum_source}" if lockfile_mode && result.checksum_source
       end
 
+      # Prints a checksum mismatch.
       def print_mismatch_result(result, label)
         @stdout.puts "FAIL #{label}"
         @stdout.puts "     expected #{result.expected_sha256}"
         @stdout.puts "     actual   #{result.actual_sha256}"
       end
 
+      # Prints an unexpected verifier error.
       def print_error_result(result, label)
         @stdout.puts "ERROR #{label}"
         @stdout.puts "      #{result.error.class}: #{result.error.message}"
       end
 
+      # Prints lockfile checksum coverage.
       def print_lockfile_coverage(lockfile_data)
         covered = lockfile_data.dependencies.size - lockfile_data.missing_checksum_dependencies.size
         total = lockfile_data.dependencies.size
@@ -51,10 +58,12 @@ module Gem
         end
       end
 
+      # Prints the CLI usage text.
       def usage
         @stdout.puts(USAGE)
       end
 
+      # CLI usage text.
       USAGE = <<~USAGE.freeze
         gem-guardian #{VERSION}
 
