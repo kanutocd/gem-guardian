@@ -8,25 +8,25 @@
 
 Consumer-side integrity verification for Ruby gems.
 
-`gem-guardian` verifies downloaded `.gem` artifacts against the SHA256 checksum reported by RubyGems.org. It is intentionally small: no Bundler monkeypatching, no install hooks, and no custom publishing flow required.
+`gem-guardian` audits Bundler checksum coverage and, where needed, verifies `.gem` artifacts against the SHA256 checksum reported by RubyGems.org. It is intentionally small: no Bundler monkeypatching, no install hooks, and no custom publishing flow required.
 
 ## Why
 
-RubyGems.org displays SHA256 checksums for published gem artifacts, and modern Bundler can store checksums in `Gemfile.lock`. But there is still room for a simple consumer-side verification workflow that can be run explicitly in CI or locally.
+RubyGems.org displays SHA256 checksums for published gem artifacts, and Bundler 2.6 can store and enforce checksums in `Gemfile.lock`. That means the most useful v0.1.0 is not a parallel verifier, but an audit tool that tells you whether your bundle is actually protected.
 
-This MVP verifies:
+This v0.1.0 scope is:
 
 ```text
-Gemfile.lock / explicit gem version
+Gemfile.lock
     ↓
-RubyGems.org expected SHA256
+CHECKSUMS coverage audit
     ↓
-Downloaded .gem artifact
+RubyGems.org checksum comparison when needed
     ↓
-Local SHA256 comparison
+Actionable report for CI or local review
 ```
 
-This proves that the local artifact matches what RubyGems.org serves. It does **not** yet prove source provenance such as signed tag → CI build → published gem.
+This proves whether your lockfile is using Bundler checksum protection and whether any locked gems are missing expected checksum data. It does **not** yet prove source provenance such as signed tag → CI build → published gem.
 
 ## Installation
 
@@ -72,19 +72,21 @@ gem-guardian verify --lockfile path/to/Gemfile.lock
 
 ## MVP constraints
 
-- Uses RubyGems.org as the checksum source of truth.
-- Downloads artifacts from RubyGems.org `/downloads/<gem-file>.gem`.
+- Audits `Gemfile.lock` for Bundler `CHECKSUMS` coverage.
+- Uses RubyGems.org as a fallback checksum source when the lockfile is incomplete or an explicit gem is supplied.
+- Downloads artifacts from RubyGems.org `/downloads/<gem-file>.gem` only when verification is needed.
 - Caches downloaded artifacts under the system temp directory.
 - Does not integrate into Bundler install hooks.
 - Does not yet verify Sigstore, SLSA, GitHub Actions provenance, or signed git tags.
 
 ## Roadmap
 
-- `gem-guardian lock` to emit or update checksum metadata.
-- Support Bundler 2.6 `CHECKSUMS` sections as an offline expected-checksum source.
+- `gem-guardian lock` to emit or update Bundler checksum metadata.
+- First-class Bundler `CHECKSUMS` audit mode with missing-checksum reporting and CI-friendly exit codes.
+- Machine-readable JSON output for CI.
 - Provenance verification for gems published through Trusted Publishing.
 - GitHub Release checksum/signature discovery.
-- Machine-readable JSON output for CI.
+- Signed tag and release attestation checks.
 
 
 ## License
