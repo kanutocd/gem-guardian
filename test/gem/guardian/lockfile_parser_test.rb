@@ -107,6 +107,14 @@ module Gem
         end
       end
 
+      def test_reports_missing_sha256_when_only_other_algorithms_are_present
+        dependency = Dependency.new(name: "rake", version: "13.2.1", platform: "ruby")
+        lockfile = LockfileParser::LockfileData.new([dependency], { dependency => { "sha512" => "x" } }, true)
+
+        assert_equal({}, lockfile.sha256_checksums)
+        assert_equal [dependency], lockfile.missing_checksum_dependencies
+      end
+
       def test_raises_for_missing_lockfile
         error = assert_raises(LockfileError) { LockfileParser.new("missing.lock").dependencies }
         assert_match(/Lockfile not found/, error.message)

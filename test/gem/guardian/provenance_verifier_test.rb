@@ -102,6 +102,28 @@ module Gem
         assert_equal :unsupported, result.status
         assert_nil result.expected_sha256
       end
+
+      def test_provenance_status_reports_unsupported_for_non_trusted_publishing_records
+        verifier = ProvenanceVerifier.new(client: FakeClient.new(nil))
+        record = ProvenanceRecord.new(
+          trusted_publishing: false,
+          repository: nil,
+          ref: nil,
+          workflow: nil,
+          issuer: nil,
+          subject: nil,
+          sha256: nil,
+          attestation_url: nil
+        )
+
+        assert_equal :unsupported, verifier.send(:provenance_status, record, "a" * 64)
+      end
+
+      def test_secure_compare_rejects_different_length_values
+        verifier = ProvenanceVerifier.new(client: FakeClient.new(nil))
+
+        refute verifier.send(:secure_compare, "abc", "de")
+      end
     end
   end
 end

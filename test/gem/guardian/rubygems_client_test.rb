@@ -282,6 +282,99 @@ module Gem
         assert_nil provenance.repository
       end
 
+      def test_trusted_publishing_provenance_finds_deeply_nested_payload
+        http = FakeHTTP.new(
+          "/api/v1/versions/activesupport.json" => SuccessResponse.new(
+            JSON.dump([
+                        {
+                          "number" => "8.0.0",
+                          "platform" => "",
+                          "trusted_publishing" => "true",
+                          "provenance" => "signed",
+                          "payload" => [
+                            { "ignore" => "me" },
+                            {
+                              "source_repository" => "ruby/activesupport",
+                              "source_commit" => "ruby/activesupport@abc123",
+                              "workflow_name" => "release.yml",
+                              "digest" => "f" * 64,
+                              "transparency_log_entry" => "https://example.test/log/123"
+                            }
+                          ]
+                        }
+                      ])
+          )
+        )
+
+        client = RubygemsClient.new(http:)
+        provenance = client.trusted_publishing_provenance(Dependency.new(name: "activesupport", version: "8.0.0",
+                                                                         platform: "ruby"))
+
+        refute_nil provenance
+        assert(provenance.trusted_publishing)
+        assert_equal "ruby/activesupport", provenance.repository
+        assert_equal "ruby/activesupport@abc123", provenance.ref
+        assert_equal "release.yml", provenance.workflow
+        assert_equal "https://example.test/log/123", provenance.attestation_url
+        assert_equal "f" * 64, provenance.sha256
+      end
+
+      def test_trusted_publishing_provenance_returns_nil_when_html_has_no_provenance_markers
+        http = FakeHTTP.new(
+          "/api/v1/versions/nope.json" => SuccessResponse.new(
+            JSON.dump([
+                        {
+                          "number" => "1.0.0",
+                          "platform" => ""
+                        }
+                      ])
+          ),
+          "/gems/nope/versions/1.0.0" => SuccessResponse.new("<html><body>No provenance here</body></html>")
+        )
+
+        client = RubygemsClient.new(http:)
+
+        assert_nil client.trusted_publishing_provenance(Dependency.new(name: "nope", version: "1.0.0", platform: "ruby"))
+      end
+
+      def test_trusted_publishing_provenance_returns_nil_when_attestation_has_no_certificate
+        http = FakeHTTP.new(
+          "/api/v1/versions/nope.json" => SuccessResponse.new(
+            JSON.dump([
+                        {
+                          "number" => "1.0.0",
+                          "platform" => ""
+                        }
+                      ])
+          ),
+          "/api/v1/attestations/nope-1.0.0.json" => SuccessResponse.new(JSON.dump([{}])),
+          "/gems/nope/versions/1.0.0" => SuccessResponse.new("<html><body>No provenance here</body></html>")
+        )
+
+        client = RubygemsClient.new(http:)
+
+        assert_nil client.trusted_publishing_provenance(Dependency.new(name: "nope", version: "1.0.0", platform: "ruby"))
+      end
+
+      def test_private_helpers_cover_blank_http_and_mismatch_paths
+        client = RubygemsClient.new(http: FakeHTTP.new({}))
+
+        assert_equal [nil, nil], client.send(:parse_source_commit, "")
+        assert_equal "https://example.com/ruby/rake",
+                     client.send(:normalize_repository, "https://example.com/ruby/rake")
+        assert_nil client.send(:build_file_from_subject_alt_name,
+                               "URI:https://github.com/ruby/rake/.github/workflows/release.yml@refs/tags/v13.2.1",
+                               "ruby/rake", "refs/tags/v13.2.2")
+        refute client.send(:provenance_hash?, { "foo" => "bar" })
+      end
+
+      def test_parse_attestation_certificate_handles_certificate_object_without_relevant_extensions
+        client = RubygemsClient.new(http: FakeHTTP.new({}))
+        certificate = build_blank_certificate
+
+        assert_nil client.send(:parse_attestation_certificate, certificate)
+      end
+
       private
 
       def build_attestation_certificate(repository:, commit:, ref:, workflow:, build_summary_url:)
@@ -305,6 +398,20 @@ module Gem
         cert.add_extension(OpenSSL::X509::Extension.new("1.3.6.1.4.1.57264.1.3", commit, false))
         cert.add_extension(OpenSSL::X509::Extension.new("1.3.6.1.4.1.57264.1.14", ref, false))
         cert.add_extension(OpenSSL::X509::Extension.new("1.3.6.1.4.1.57264.1.21", build_summary_url, false))
+        cert.sign(key, OpenSSL::Digest.new("SHA256"))
+        cert
+      end
+
+      def build_blank_certificate
+        key = OpenSSL::PKey::RSA.new(2048)
+        cert = OpenSSL::X509::Certificate.new
+        cert.version = 2
+        cert.serial = 2
+        cert.subject = OpenSSL::X509::Name.parse("/CN=Sigstore Test")
+        cert.issuer = cert.subject
+        cert.public_key = key.public_key
+        cert.not_before = Time.now - 60
+        cert.not_after = Time.now + 3600
         cert.sign(key, OpenSSL::Digest.new("SHA256"))
         cert
       end
