@@ -29,7 +29,7 @@ namespace :rbs do
 
   desc "Validate curated RBS signatures with Steep"
   task :validate do
-    sh "bundle exec steep check"
+    sh "bundle exec rbs validate sig"
   end
 
   desc "Open diff between curated and generated signatures"
