@@ -8,6 +8,11 @@ module Gem
   module Guardian
     # Reads checksum metadata from RubyGems.org and downloads gem artifacts.
     class RubygemsClient
+      # Trusted Publishing provenance metadata extracted from RubyGems version data.
+      TrustedPublishingProvenance = Data.define(
+        :trusted_publishing, :repository, :ref, :workflow, :issuer, :subject, :sha256, :attestation_url
+      )
+
       # Default RubyGems.org endpoint used by the client.
       DEFAULT_HOST = "https://rubygems.org"
 
@@ -26,6 +31,12 @@ module Gem
         end
 
         sha.downcase
+      end
+
+      # Returns trusted publishing provenance data for +dependency+ when RubyGems exposes it.
+      def trusted_publishing_provenance(dependency)
+        version = matching_version(dependency)
+        version && provenance_for(version)
       end
 
       # Downloads the .gem file for +dependency+ into +destination+.
@@ -48,6 +59,49 @@ module Gem
 
       def version_checksum(version)
         version["sha"] || version["sha256"] || version["checksum"]
+      end
+
+      # Extracts trusted publishing provenance data from a RubyGems version payload.
+      def provenance_for(version)
+        provenance = provenance_payload(version)
+        trusted_publishing = trusted_publishing?(provenance, version)
+        return unless trusted_publishing || provenance.any?
+
+        TrustedPublishingProvenance.new(**provenance_attributes(provenance).merge(trusted_publishing:))
+      end
+
+      # Returns the provenance payload from a version hash.
+      def provenance_payload(version)
+        payload = version["provenance"] || version["trusted_publishing"] || version["attestation"] || {}
+        payload.is_a?(Hash) ? payload : {}
+      end
+
+      # Returns the first non-empty provenance string value for the provided keys.
+      def provenance_string(provenance, *keys)
+        keys.map { |key| provenance[key] }.find { |value| !blank?(value) }&.to_s
+      end
+
+      # Returns the trusted publishing flag for a version payload.
+      def trusted_publishing?(provenance, version)
+        truthy?(provenance["trusted_publishing"]) || truthy?(version["trusted_publishing"])
+      end
+
+      # Returns the extracted provenance attributes.
+      def provenance_attributes(provenance)
+        {
+          repository: provenance_string(provenance, "repository", "repository_url", "source_repository"),
+          ref: provenance_string(provenance, "ref", "source_ref", "git_ref", "tag"),
+          workflow: provenance_string(provenance, "workflow", "workflow_name"),
+          issuer: provenance_string(provenance, "issuer"),
+          subject: provenance_string(provenance, "subject"),
+          sha256: provenance_string(provenance, "sha256", "checksum", "digest"),
+          attestation_url: provenance_string(provenance, "attestation_url", "provenance_url", "url")
+        }
+      end
+
+      # Returns true when +value+ looks truthy in API payload form.
+      def truthy?(value)
+        value == true || value.to_s.casecmp("true").zero?
       end
 
       # GETs +path+ from the configured host and returns the response body.

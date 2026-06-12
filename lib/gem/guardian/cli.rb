@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
+require "json"
+
 # Namespace for gem-guardian CLI code.
 module Gem
   # Command-line interface and output helpers.
   module Guardian
     # Command-line entry point for gem-guardian.
+    # rubocop:disable Metrics/ClassLength, Metrics/ParameterLists
     class CLI
       # Starts the CLI with the provided argv.
       def self.start(argv)
@@ -12,12 +15,15 @@ module Gem
       end
 
       def initialize(argv, stdout: $stdout, stderr: $stderr, verifier_class: Verifier,
-                     lockfile_parser_class: LockfileParser)
+                     lockfile_parser_class: LockfileParser, provenance_verifier_class: ProvenanceVerifier,
+                     report_builder_class: ReportBuilder)
         @argv = argv.dup
         @stdout = stdout
         @stderr = stderr
         @verifier_class = verifier_class
         @lockfile_parser_class = lockfile_parser_class
+        @provenance_verifier_class = provenance_verifier_class
+        @report_builder_class = report_builder_class
         @result_printer = ResultPrinter.new(stdout:)
       end
 
@@ -39,17 +45,22 @@ module Gem
       end
 
       # Runs the verify subcommand.
+      # rubocop:disable Metrics/MethodLength
       def verify
-        lockfile_data, dependencies = resolve_dependencies
+        json_output = flag?("--json")
+        provenance_mode = flag?("--provenance")
+        lockfile_data, dependencies, lockfile_path = resolve_dependencies
         return no_dependencies if dependencies.empty?
 
         results = verifier_for(lockfile_data).verify_all(dependencies)
-        print_verification_report(results, lockfile_data)
-        verification_exit_status(results, lockfile_data)
+        provenance_results = provenance_results_for(results, provenance_mode)
+        output_verification(results, lockfile_data, provenance_results, json_output, lockfile_path)
+        verification_exit_status(results, lockfile_data, provenance_results)
       rescue Error => e
         @stderr.puts e.message
         1
       end
+      # rubocop:enable Metrics/MethodLength
 
       # Parses a GEM:VERSION[:PLATFORM] spec string.
       def parse_gem_spec(spec)
@@ -61,15 +72,44 @@ module Gem
 
       def resolve_dependencies
         lockfile = option_value("--lockfile") || "Gemfile.lock"
-        return [nil, @argv.map { |spec| parse_gem_spec(spec) }] unless @argv.empty?
+        return [nil, @argv.map { |spec| parse_gem_spec(spec) }, nil] unless @argv.empty?
 
         lockfile_data = @lockfile_parser_class.new(lockfile).parse
-        [lockfile_data, lockfile_data.dependencies]
+        [lockfile_data, lockfile_data.dependencies, lockfile]
       end
 
       def verifier_for(lockfile_data)
         expected_checksums = lockfile_data&.sha256_checksums || {}
         @verifier_class.new(expected_checksums:)
+      end
+
+      def provenance_verifier_for
+        @provenance_verifier_class.new
+      end
+
+      def provenance_results_for(results, provenance_mode)
+        return [] unless provenance_mode
+
+        provenance_verifier_for.verify_all(results)
+      end
+
+      def output_verification(results, lockfile_data, provenance_results, json_output, lockfile_path)
+        if json_output
+          write_json_report(results, lockfile_data, provenance_results, lockfile_path)
+        else
+          write_human_report(results, lockfile_data, provenance_results)
+        end
+      end
+
+      def write_json_report(results, lockfile_data, provenance_results, lockfile_path)
+        @stdout.puts JSON.pretty_generate(
+          report_builder.build(results, lockfile_data:, provenance_results:, lockfile_path:)
+        )
+      end
+
+      def write_human_report(results, lockfile_data, provenance_results)
+        print_verification_report(results, lockfile_data)
+        @result_printer.print_provenance_results(provenance_results) unless provenance_results.empty?
       end
 
       def print_verification_report(results, lockfile_data)
@@ -80,10 +120,11 @@ module Gem
         @result_printer.print_lockfile_coverage(lockfile_data)
       end
 
-      def verification_exit_status(results, lockfile_data)
+      def verification_exit_status(results, lockfile_data, provenance_results = [])
         all_ok = results.all?(&:ok?)
         all_covered = lockfile_data.nil? || lockfile_data.missing_checksum_dependencies.empty?
-        all_ok && all_covered ? 0 : 1
+        provenance_ok = provenance_results.all? { |result| !%i[mismatch error].include?(result.status) }
+        all_ok && all_covered && provenance_ok ? 0 : 1
       end
 
       def no_dependencies
@@ -114,11 +155,26 @@ module Gem
         value
       end
 
+      # Returns true when +name+ is present and removes it from argv.
+      def flag?(name)
+        index = @argv.index(name)
+        return false unless index
+
+        @argv.delete_at(index)
+        true
+      end
+
+      # Returns the report builder for structured output.
+      def report_builder
+        @report_builder_class.new(version: VERSION)
+      end
+
       # Prints usage text.
       def usage(_io = @stdout)
         @result_printer.usage
         0
       end
     end
+    # rubocop:enable Metrics/ClassLength, Metrics/ParameterLists
   end
 end
