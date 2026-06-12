@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-12
+
+- Add `--json` output for CI-friendly verification reports.
+- Add opt-in Trusted Publishing provenance verification for RubyGems releases.
+- Verify provenance through RubyGems attestations for supported releases.
+
 ## [0.1.1] - 2026-06-12
 
 - Parse Bundler `CHECKSUMS` entries from `Gemfile.lock`.

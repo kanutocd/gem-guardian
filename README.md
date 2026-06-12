@@ -8,13 +8,13 @@
 
 Consumer-side integrity verification for Ruby gems.
 
-`gem-guardian` audits Bundler checksum coverage and, where needed, verifies `.gem` artifacts against the SHA256 checksum reported by RubyGems.org. It is intentionally small: no Bundler monkeypatching, no install hooks, and no custom publishing flow required.
+`gem-guardian` audits Bundler checksum coverage, verifies `.gem` artifacts against RubyGems SHA256 data when needed, and can verify Trusted Publishing provenance for supported releases. It stays intentionally small: no Bundler monkeypatching, no install hooks, and no custom publishing flow required.
 
 ## Why
 
-RubyGems.org displays SHA256 checksums for published gem artifacts, and Bundler 2.6 can store and enforce checksums in `Gemfile.lock`. That means the most useful v0.1.0 is not a parallel verifier, but an audit tool that tells you whether your bundle is actually protected.
+RubyGems.org displays SHA256 checksums for published gem artifacts, Bundler 2.6 can store and enforce checksums in `Gemfile.lock`, and RubyGems now exposes attestation data for Trusted Publishing releases. That means the most useful current release is an audit and verification tool that tells you whether your bundle and release metadata are actually protected.
 
-This v0.1.0 scope is:
+This 0.2.0 scope is:
 
 ```text
 Gemfile.lock
@@ -23,10 +23,12 @@ CHECKSUMS coverage audit
     ↓
 RubyGems.org checksum comparison when needed
     ↓
+Trusted Publishing provenance verification when available
+    ↓
 Actionable report for CI or local review
 ```
 
-This reports whether your lockfile is using Bundler checksum protection and whether any locked gems are missing expected checksum data. It does **not** yet prove source provenance such as signed tag → CI build → published gem.
+This reports whether your lockfile is using Bundler checksum protection, whether any locked gems are missing expected checksum data, and whether RubyGems exposes Trusted Publishing provenance for the gem being verified. It does **not** yet prove source provenance for releases that do not publish attestation data.
 
 ## Installation
 
@@ -34,7 +36,7 @@ From a local checkout:
 
 ```bash
 gem build gem-guardian.gemspec
-gem install ./gem-guardian-0.1.0.gem
+gem install ./gem-guardian-0.2.0.gem
 ```
 
 ## Usage
@@ -43,7 +45,7 @@ Build and install the current release from a local checkout:
 
 ```bash
 gem build gem-guardian.gemspec
-gem install ./gem-guardian-0.1.1.gem
+gem install ./gem-guardian-0.2.0.gem
 gem-guardian version
 ```
 
@@ -85,7 +87,16 @@ Use a non-default lockfile:
 gem-guardian verify --lockfile path/to/Gemfile.lock
 ```
 
+Emit JSON for CI:
+
+```bash
+gem-guardian verify --json
+gem-guardian verify --json --provenance
+```
+
 When you verify a lockfile that already contains Bundler `CHECKSUMS`, `gem-guardian` reports coverage and compares the locked checksum to the downloaded artifact. When a checksum is missing, it falls back to RubyGems.org metadata and marks that verification accordingly.
+
+Use `--provenance` to inspect Trusted Publishing metadata when RubyGems exposes it. Unsupported gems are reported, but they do not fail the run unless the provenance data is present and mismatched.
 
 ## Exit codes
 
@@ -104,8 +115,6 @@ When you verify a lockfile that already contains Bundler `CHECKSUMS`, `gem-guard
 
 ## Roadmap
 
-- Machine-readable JSON output for CI.
-- Provenance verification for gems published through Trusted Publishing.
 - GitHub Release checksum/signature discovery.
 - Signed tag and release attestation checks.
 
