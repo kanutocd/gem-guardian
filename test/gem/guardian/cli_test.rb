@@ -5,8 +5,10 @@ require_relative "../../test_helper"
 module Gem
   module Guardian
     class CLITest < Minitest::Test
-      FakeLockfileData = Struct.new(:dependencies, :sha256_checksums, :missing_checksum_dependencies, keyword_init: true)
-      FakeVerifierResult = Data.define(:dependency, :expected_sha256, :actual_sha256, :artifact_path, :status, :error, :checksum_source) do
+      FakeLockfileData = Struct.new(:dependencies, :sha256_checksums, :missing_checksum_dependencies,
+                                    keyword_init: true)
+      FakeVerifierResult = Data.define(:dependency, :expected_sha256, :actual_sha256, :artifact_path, :status, :error,
+                                       :checksum_source) do
         def ok?
           status == :ok
         end
@@ -63,6 +65,113 @@ module Gem
         assert_match(/Unknown command/, stderr.string)
       end
 
+      def test_help_and_no_args_show_usage
+        stdout = StringIO.new
+        help_status = CLI.new(["help"], stdout:).run
+        nil_status = CLI.new([], stdout:).run
+
+        assert_equal 0, help_status
+        assert_equal 0, nil_status
+        assert_match(/gem-guardian verify/, stdout.string)
+      end
+
+      def test_verify_uses_lockfile_option
+        captured = []
+        parser_class = Class.new do
+          define_method(:initialize) do |path|
+            captured << path
+          end
+
+          define_method(:parse) do
+            dependency = Dependency.new(name: "rake", version: "13.2.1", platform: "ruby")
+            FakeLockfileData.new(
+              dependencies: [dependency],
+              sha256_checksums: { dependency => "a" * 64 },
+              missing_checksum_dependencies: []
+            )
+          end
+        end
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--lockfile", "custom.lock"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: parser_class
+        ).run
+
+        assert_equal 0, status
+        assert_equal ["custom.lock"], captured
+      end
+
+      def test_verify_rejects_missing_lockfile_value
+        stderr = StringIO.new
+        status = CLI.new(["verify", "--lockfile"], stderr:).run
+
+        assert_equal 1, status
+        assert_match(/requires a value/, stderr.string)
+      end
+
+      def test_verify_rejects_invalid_dependency_spec
+        stderr = StringIO.new
+        status = CLI.new(%w[verify rake], stderr:).run
+
+        assert_equal 1, status
+        assert_match(/Expected GEM:VERSION/, stderr.string)
+      end
+
+      def test_verify_returns_error_when_no_dependencies_are_found
+        parser_class = Class.new do
+          define_method(:initialize) { |_path| }
+          define_method(:parse) do
+            FakeLockfileData.new(
+              dependencies: [],
+              sha256_checksums: {},
+              missing_checksum_dependencies: []
+            )
+          end
+        end
+
+        stderr = StringIO.new
+        status = CLI.new(
+          ["verify"],
+          stdout: StringIO.new,
+          stderr:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: parser_class
+        ).run
+
+        assert_equal 1, status
+        assert_match(/No gems found to verify/, stderr.string)
+      end
+
+      def test_verify_reports_lockfile_fallback
+        dependency = Dependency.new(name: "nokogiri", version: "1.18.9", platform: "x86_64-linux")
+        parser_class = Class.new do
+          define_method(:initialize) { |_path| }
+
+          define_method(:parse) do
+            FakeLockfileData.new(
+              dependencies: [dependency],
+              sha256_checksums: {},
+              missing_checksum_dependencies: [dependency]
+            )
+          end
+        end
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: parser_class
+        ).run
+
+        assert_equal 1, status
+        assert_match(/FALLBACK nokogiri 1.18.9 x86_64-linux/, stdout.string)
+        assert_match(%r{CHECKSUMS coverage: 0/1}, stdout.string)
+      end
+
       def test_verify_reports_lockfile_coverage
         stdout = StringIO.new
         status = CLI.new(
@@ -74,7 +183,7 @@ module Gem
 
         assert_equal 0, status
         assert_match(/PASS rake 13.2.1 ruby/, stdout.string)
-        assert_match(/CHECKSUMS coverage: 1\/1/, stdout.string)
+        assert_match(%r{CHECKSUMS coverage: 1/1}, stdout.string)
       end
 
       def test_verify_fails_when_lockfile_has_missing_checksums
@@ -100,7 +209,59 @@ module Gem
 
         assert_equal 1, status
         assert_match(/MISSING nokogiri 1.18.9 x86_64-linux/, stdout.string)
-        assert_match(/CHECKSUMS coverage: 0\/1/, stdout.string)
+        assert_match(%r{CHECKSUMS coverage: 0/1}, stdout.string)
+      end
+
+      def test_verify_reports_verifier_error_and_mismatch
+        dependency = Dependency.new(name: "rake", version: "13.2.1", platform: "ruby")
+        parser_class = Class.new do
+          define_method(:initialize) { |_path| }
+          define_method(:parse) do
+            FakeLockfileData.new(
+              dependencies: [dependency],
+              sha256_checksums: { dependency => "a" * 64 },
+              missing_checksum_dependencies: []
+            )
+          end
+        end
+
+        verifier_class = Class.new do
+          define_method(:initialize) { |expected_checksums: {}| }
+          define_method(:verify_all) do |dependencies|
+            [
+              FakeVerifierResult.new(
+                dependency: dependencies.first,
+                expected_sha256: "a" * 64,
+                actual_sha256: "b" * 64,
+                artifact_path: "/tmp/rake.gem",
+                status: :mismatch,
+                error: nil,
+                checksum_source: :lockfile
+              ),
+              FakeVerifierResult.new(
+                dependency: dependencies.first,
+                expected_sha256: nil,
+                actual_sha256: nil,
+                artifact_path: nil,
+                status: :error,
+                error: IOError.new("boom"),
+                checksum_source: nil
+              )
+            ]
+          end
+        end
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify"],
+          stdout:,
+          verifier_class: verifier_class,
+          lockfile_parser_class: parser_class
+        ).run
+
+        assert_equal 1, status
+        assert_match(/FAIL rake 13.2.1 ruby/, stdout.string)
+        assert_match(/ERROR rake 13.2.1 ruby/, stdout.string)
       end
 
       def test_verify_explicit_gems_do_not_use_fallback_label

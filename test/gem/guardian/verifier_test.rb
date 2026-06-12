@@ -69,6 +69,30 @@ module Gem
           assert_equal :rubygems, result.checksum_source
         end
       end
+
+      def test_verify_returns_error_when_artifact_store_fails
+        dep = Dependency.new(name: "sample", version: "1.0.0", platform: "ruby")
+
+        result = Verifier.new(
+          client: FakeClient.new(expected: "a" * 64),
+          artifact_store: Class.new do
+            def path_for(_dependency)
+              raise IOError, "cache unavailable"
+            end
+          end.new,
+          expected_checksums: { dep => "a" * 64 }
+        ).verify(dep)
+
+        assert_equal :error, result.status
+        assert_instance_of IOError, result.error
+      end
+
+      def test_secure_compare_rejects_different_lengths
+        verifier = Verifier.new(client: FakeClient.new(expected: "a" * 64),
+                                artifact_store: FakeStore.new(path: "/tmp/unused"))
+
+        refute verifier.send(:secure_compare, "abc", "abcd")
+      end
     end
   end
 end
