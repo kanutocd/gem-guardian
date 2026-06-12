@@ -18,7 +18,11 @@ module Gem
 
       FakeProvenanceResult = Data.define(
         :dependency, :status, :trusted_publishing, :repository, :ref, :workflow, :issuer, :subject,
-        :expected_sha256, :actual_sha256, :error, :attestation_url
+        :expected_sha256, :actual_sha256, :error, :attestation_url, :github_release
+      )
+      FakeGitHubReleaseResult = Data.define(
+        :dependency, :status, :repository, :tag, :checksum_assets, :signature_assets, :signed_tag,
+        :signed_tag_reason, :release_attestation, :release_url, :error
       )
 
       class FakeVerifier
@@ -48,20 +52,21 @@ module Gem
 
         def verify_all(results)
           results.map do |result|
-            FakeProvenanceResult.new(
-              dependency: result.dependency,
-              status: :verified,
+              FakeProvenanceResult.new(
+                dependency: result.dependency,
+                status: :verified,
               trusted_publishing: true,
               repository: "https://github.com/kanutocd/gem-guardian",
               ref: "refs/tags/v0.1.1",
               workflow: "release.yml",
               issuer: "https://token.actions.githubusercontent.com",
               subject: "repo:kanutocd/gem-guardian:ref:refs/tags/v0.1.1",
-              expected_sha256: result.actual_sha256,
-              actual_sha256: result.actual_sha256,
-              error: nil,
-              attestation_url: "https://rubygems.org"
-            )
+                expected_sha256: result.actual_sha256,
+                actual_sha256: result.actual_sha256,
+                error: nil,
+                attestation_url: "https://rubygems.org",
+                github_release: nil
+              )
           end
         end
       end
@@ -321,7 +326,7 @@ module Gem
 
         assert_equal 0, status
         assert_equal "verify", report["command"]
-        assert_equal "0.2.0", report["version"]
+        assert_equal "0.3.0", report["version"]
         assert_equal "lockfile", report["mode"]
         assert_equal 1, report.dig("checksums", "coverage", "total")
         assert_equal "rake", report.dig("results", 0, "name")
@@ -377,6 +382,125 @@ module Gem
         assert_equal true, report.dig("results", 0, "provenance", "trusted_publishing")
       end
 
+      def test_verify_can_emit_github_release_results
+        github_release = FakeGitHubReleaseResult.new(
+          dependency: Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"),
+          status: :verified,
+          repository: "kanutocd/gem-guardian",
+          tag: "v0.1.1",
+          checksum_assets: ["gem-guardian-0.1.1.gem.sha256"],
+          signature_assets: ["gem-guardian-0.1.1.gem.sig"],
+          signed_tag: true,
+          signed_tag_reason: "valid",
+          release_attestation: true,
+          release_url: "https://github.com/kanutocd/gem-guardian/releases/tag/v0.1.1",
+          error: nil
+        )
+        provenance_result = FakeProvenanceResult.new(
+          dependency: github_release.dependency,
+          status: :verified,
+          trusted_publishing: true,
+          repository: "https://github.com/kanutocd/gem-guardian",
+          ref: "refs/tags/v0.1.1",
+          workflow: "release.yml",
+          issuer: "https://token.actions.githubusercontent.com",
+          subject: "repo:kanutocd/gem-guardian:ref:refs/tags/v0.1.1",
+          expected_sha256: "a" * 64,
+          actual_sha256: "a" * 64,
+          error: nil,
+          attestation_url: "https://rubygems.org",
+          github_release:
+        )
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--provenance", "rake:13.2.1"],
+          stdout:,
+          verifier_class: Class.new do
+            define_method(:initialize) { |expected_checksums:| }
+            define_method(:verify_all) { |dependencies| dependencies.map { |_dependency| FakeVerifierResult.new(
+              dependency: github_release.dependency,
+              expected_sha256: "a" * 64,
+              actual_sha256: "a" * 64,
+              artifact_path: "/tmp/rake.gem",
+              status: :ok,
+              error: nil,
+              checksum_source: :rubygems
+            ) } }
+          end,
+          provenance_verifier_class: Class.new do
+            define_method(:initialize) { |_client = nil| }
+            define_method(:verify_all) { |results| [provenance_result] }
+          end,
+          lockfile_parser_class: FakeLockfileParser
+        ).run
+
+        assert_equal 0, status
+        assert_match(/GITHUB RELEASE VERIFIED/, stdout.string)
+        assert_match(/checksum assets gem-guardian-0.1.1.gem.sha256/, stdout.string)
+        assert_match(/signature assets gem-guardian-0.1.1.gem.sig/, stdout.string)
+      end
+
+      def test_verify_can_emit_json_github_release_results
+        github_release = FakeGitHubReleaseResult.new(
+          dependency: Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"),
+          status: :verified,
+          repository: "kanutocd/gem-guardian",
+          tag: "v0.1.1",
+          checksum_assets: ["gem-guardian-0.1.1.gem.sha256"],
+          signature_assets: ["gem-guardian-0.1.1.gem.sig"],
+          signed_tag: true,
+          signed_tag_reason: "valid",
+          release_attestation: true,
+          release_url: "https://github.com/kanutocd/gem-guardian/releases/tag/v0.1.1",
+          error: nil
+        )
+        provenance_result = FakeProvenanceResult.new(
+          dependency: github_release.dependency,
+          status: :verified,
+          trusted_publishing: true,
+          repository: "https://github.com/kanutocd/gem-guardian",
+          ref: "refs/tags/v0.1.1",
+          workflow: "release.yml",
+          issuer: "https://token.actions.githubusercontent.com",
+          subject: "repo:kanutocd/gem-guardian:ref:refs/tags/v0.1.1",
+          expected_sha256: "a" * 64,
+          actual_sha256: "a" * 64,
+          error: nil,
+          attestation_url: "https://rubygems.org",
+          github_release:
+        )
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--json", "--provenance", "rake:13.2.1"],
+          stdout:,
+          verifier_class: Class.new do
+            define_method(:initialize) { |expected_checksums:| }
+            define_method(:verify_all) { |dependencies| dependencies.map { |_dependency| FakeVerifierResult.new(
+              dependency: github_release.dependency,
+              expected_sha256: "a" * 64,
+              actual_sha256: "a" * 64,
+              artifact_path: "/tmp/rake.gem",
+              status: :ok,
+              error: nil,
+              checksum_source: :rubygems
+            ) } }
+          end,
+          provenance_verifier_class: Class.new do
+            define_method(:initialize) { |_client = nil| }
+            define_method(:verify_all) { |_results| [provenance_result] }
+          end,
+          lockfile_parser_class: FakeLockfileParser
+        ).run
+
+        report = JSON.parse(stdout.string)
+
+        assert_equal 0, status
+        assert_equal "verified", report.dig("results", 0, "provenance", "github_release", "status")
+        assert_equal ["gem-guardian-0.1.1.gem.sig"], report.dig("results", 0, "provenance", "github_release", "signature_assets")
+      end
+
       def test_verify_reports_mixed_provenance_statuses
         provenance_verifier_class = Class.new do
           define_method(:initialize) { |_client = nil| }
@@ -395,7 +519,8 @@ module Gem
                 expected_sha256: results[0].actual_sha256,
                 actual_sha256: results[0].actual_sha256,
                 error: nil,
-                attestation_url: "https://rubygems.org"
+                attestation_url: "https://rubygems.org",
+                github_release: nil
               ),
               FakeProvenanceResult.new(
                 dependency: results[1].dependency,
@@ -409,7 +534,8 @@ module Gem
                 expected_sha256: "a" * 64,
                 actual_sha256: "b" * 64,
                 error: nil,
-                attestation_url: "https://rubygems.org"
+                attestation_url: "https://rubygems.org",
+                github_release: nil
               ),
               FakeProvenanceResult.new(
                 dependency: results[2].dependency,
@@ -423,7 +549,8 @@ module Gem
                 expected_sha256: nil,
                 actual_sha256: nil,
                 error: nil,
-                attestation_url: nil
+                attestation_url: nil,
+                github_release: nil
               )
             ]
           end
@@ -462,7 +589,8 @@ module Gem
                 expected_sha256: nil,
                 actual_sha256: results.first.actual_sha256,
                 error: RuntimeError.new("boom"),
-                attestation_url: nil
+                attestation_url: nil,
+                github_release: nil
               )
             ]
           end

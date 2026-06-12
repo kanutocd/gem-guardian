@@ -124,6 +124,44 @@ module Gem
 
         refute verifier.send(:secure_compare, "abc", "de")
       end
+
+      def test_combine_status_prefers_github_mismatch_and_error
+        verifier = ProvenanceVerifier.new(client: FakeClient.new(nil))
+
+        assert_equal :mismatch, verifier.send(:combine_status, :verified, :mismatch)
+        assert_equal :error, verifier.send(:combine_status, :verified, :error)
+        assert_equal :verified, verifier.send(:combine_status, :verified, :verified)
+        assert_equal :unsupported, verifier.send(:combine_status, :unsupported, nil)
+      end
+
+      def test_github_release_result_rescues_errors
+        client = FakeClient.new(
+          ProvenanceRecord.new(
+            trusted_publishing: true,
+            repository: "https://github.com/ruby/rake",
+            ref: "refs/tags/v13.2.1",
+            workflow: "release.yml",
+            issuer: "https://token.actions.githubusercontent.com",
+            subject: "repo:ruby/rake:ref:refs/tags/v13.2.1",
+            sha256: "a" * 64,
+            attestation_url: "https://rubygems.org"
+          )
+        )
+        verifier = ProvenanceVerifier.new(
+          client:,
+          github_release_verifier: Class.new do
+            def verify(_provenance)
+              raise Error, "boom"
+            end
+          end.new
+        )
+
+        result = verifier.verify(Dependency.new(name: "rake", version: "13.2.1", platform: "ruby"),
+                                artifact_sha256: "a" * 64)
+
+        assert_equal :verified, result.status
+        assert_nil result.github_release
+      end
     end
   end
 end
