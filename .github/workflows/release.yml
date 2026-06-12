@@ -25,7 +25,20 @@ jobs:
         with:
           ruby-version: "3.4"
           bundler-cache: true
+      - name: Build gem artifact
+        run: gem build gem-guardian.gemspec
+      - name: Generate checksum
+        run: |
+          gem_file=$(ls gem-guardian-*.gem)
+          shasum -a 256 "$gem_file" > "$gem_file.sha256"
       - name: Run tests
         run: bundle exec rake
       - name: Release gem to RubyGems.org
         uses: rubygems/release-gem@v1
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            gem-guardian-*.gem
+            gem-guardian-*.gem.sha256

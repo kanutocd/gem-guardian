@@ -106,6 +106,24 @@ module Gem
 
         assert_nil client.tag_verification("kanutocd/gem-guardian", "v0.1.1")
       end
+
+      def test_tag_verification_returns_nil_for_malformed_payloads
+        client = GitHubClient.new(http: FakeHTTP.new(
+                                   "/repos/kanutocd/gem-guardian/git/ref/tags/v0.1.1" => SuccessResponse.new(
+                                     JSON.dump([])
+                                   )
+                                 ))
+
+        assert_nil client.tag_verification("kanutocd/gem-guardian", "v0.1.1")
+
+        client = GitHubClient.new(http: FakeHTTP.new(
+                                   "/repos/kanutocd/gem-guardian/git/ref/tags/v0.1.1" => SuccessResponse.new(
+                                     JSON.dump("object" => "oops")
+                                   )
+                                 ))
+
+        assert_nil client.tag_verification("kanutocd/gem-guardian", "v0.1.1")
+      end
     end
   end
 end

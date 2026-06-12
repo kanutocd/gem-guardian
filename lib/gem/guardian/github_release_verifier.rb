@@ -21,33 +21,37 @@ module Gem
       end
 
       # Verifies GitHub release metadata for +provenance+.
+      # rubocop:disable Metrics/AbcSize
       def verify(provenance)
         repository = github_repository(provenance.repository)
-        tag = github_tag(provenance)
-        return unsupported_result(provenance, repository, tag) unless repository && tag
+        tag_candidates = github_tag_candidates(provenance)
+        return unsupported_result(provenance, repository, tag_candidates.first) unless repository && tag_candidates.any?
 
-        release = @client.release(repository, tag)
+        release, tag = release_for(repository, tag_candidates)
         return unsupported_result(provenance, repository, tag) unless release
 
         checksum_assets = discovered_assets(release, checksum_asset_name?)
         signature_assets = discovered_assets(release, signature_asset_name?)
         tag_verification = @client.tag_verification(repository, tag)
-        build_result(
-          provenance,
-          repository,
-          tag,
-          checksum_assets,
-          signature_assets,
-          tag_verification,
-          release
-        )
+        build_release_result(provenance, repository, tag, checksum_assets, signature_assets, tag_verification, release)
       rescue StandardError => e
         error_result(provenance, repository, tag, e)
       end
+      # rubocop:enable Metrics/AbcSize
 
       private
 
-      def build_result(provenance, repository, tag, checksum_assets, signature_assets, tag_verification, release)
+      def release_for(repository, tag_candidates)
+        tag_candidates.each do |candidate|
+          release = @client.release(repository, candidate)
+          return [release, candidate] if release
+        end
+
+        [nil, tag_candidates.first]
+      end
+
+      def build_release_result(provenance, repository, tag, checksum_assets, signature_assets, tag_verification,
+                               release)
         signed_tag = signed_tag?(tag_verification)
         attestation = release_attestation(release)
         status = release_status(signed_tag, attestation, tag_verification)
@@ -108,12 +112,35 @@ module Gem
       end
 
       def github_tag(provenance)
-        ref = provenance.ref.to_s
-        return ref.delete_prefix("refs/tags/") if ref.start_with?("refs/tags/")
+        github_tag_candidates(provenance).first
+      end
 
-        subject = provenance.subject.to_s
-        match = subject.match(%r{:ref:refs/tags/([^:]+)\z})
+      def github_tag_candidates(provenance)
+        [
+          tag_from_ref(provenance.ref),
+          tag_from_subject(provenance.subject),
+          tag_from_version(provenance.dependency.version),
+          provenance.dependency.version.to_s
+        ].compact.uniq
+      end
+
+      def tag_from_ref(ref)
+        ref = ref.to_s
+        return unless ref.start_with?("refs/tags/")
+
+        ref.delete_prefix("refs/tags/")
+      end
+
+      def tag_from_subject(subject)
+        match = subject.to_s.match(%r{:ref:refs/tags/([^:]+)\z})
         match && match[1]
+      end
+
+      def tag_from_version(version)
+        version = version.to_s
+        return if version.empty?
+
+        "v#{version}"
       end
 
       def discovered_assets(release, matcher)
@@ -158,12 +185,12 @@ module Gem
       end
 
       def release_status(signed_tag, attestation, verification)
+        return :error if verification.is_a?(Hash) &&
+                         verification["verified"] == true &&
+                         verification["reason"] == "invalid"
         return :verified if signed_tag == true && attestation == true
         return :mismatch if signed_tag == false
         return :mismatch if attestation == false
-        return :error if verification.is_a?(Hash) &&
-                         verification["verified"] == false &&
-                         verification["reason"] == "invalid"
 
         :unsupported
       end
