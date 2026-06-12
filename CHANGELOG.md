@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-12
+
 - Discover GitHub Release checksum and signature assets.
 - Verify signed Git tags and GitHub release attestations when provenance exposes a GitHub tag.
+- Fall back to version-derived release tags when RubyGems provenance exposes only a commit SHA.
+- Add GitHub release metadata to JSON and human-readable provenance output when available.
+- Package the new GitHub verifier classes into the released gem.
 
 ## [0.2.0] - 2026-06-12
 
