@@ -50,6 +50,14 @@ module Gem
       # Read timeout, in seconds, for direct HTTP requests.
       READ_TIMEOUT = 30
 
+      # Built-in checksum providers used when no project configuration overrides
+      # provider order.
+      #
+      # @return [Array<#checksum_for>] RubyGems.org API and compact-index providers
+      def self.default_checksum_providers
+        [ChecksumProvider::RubyGemsApi.new, ChecksumProvider::CompactIndex.new]
+      end
+
       # @param host [String] default RubyGems host used for API requests when a dependency has no source
       # @param http [#get_response] HTTP client used for metadata and artifact requests
       # @param credentials [Object] Bundler settings-like object used to resolve source credentials
@@ -208,7 +216,7 @@ module Gem
       private
 
       def default_checksum_providers
-        [ChecksumProvider::RubyGemsApi.new, ChecksumProvider::CompactIndex.new]
+        self.class.default_checksum_providers
       end
 
       def download_gem_uri(uri, destination)

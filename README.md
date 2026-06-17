@@ -271,7 +271,7 @@ Provider metadata is included in JSON output as:
 ```
 
 The URL provider is intentionally generic so a publisher can expose a checksum file without implementing RubyGems.org's metadata API.
-A future Mammoth Pro/Enterprise-style distribution could expose something like:
+A commercial or private registry can expose something like:
 
 ```text
 https://example.com/checksums/{filename}.sha256
@@ -282,6 +282,44 @@ with contents such as:
 ```text
 <sha256>  <filename>
 ```
+
+### Project configuration
+
+Project-level checksum providers can be declared in `.gem-guardian.yml`:
+
+```yaml
+checksum_providers:
+  - name: awesome-gems-registry
+    source: https://gems.everything-is-awesome.com/
+    template: https://gems.everything-is-awesome.com/checksums/{filename}.sha256
+```
+
+The `source` field scopes the provider to gems resolved from that registry, so a private checksum URL is not queried for unrelated public gems. The `template` field supports these placeholders:
+
+- `{name}`
+- `{version}`
+- `{platform}`
+- `{filename}`
+
+For example, a locked `mammoth-pro` artifact named `mammoth-pro-1.0.0.gem` would resolve to:
+
+```text
+https://gems.everything-is-awesome.com/checksums/mammoth-pro-1.0.0.gem.sha256
+```
+
+This lets private publishers integrate with gem-guardian without implementing the RubyGems.org versions API. When the checksum file is available, explicit mode can verify:
+
+```text
+publisher checksum == artifact checksum
+```
+
+and lockfile mode can perform the strongest path:
+
+```text
+lockfile checksum == publisher checksum == artifact checksum
+```
+
+Set `GEM_GUARDIAN_CONFIG=/path/to/config.yml` to load configuration from a non-default location.
 
 ## Provenance mode
 

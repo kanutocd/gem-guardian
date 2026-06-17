@@ -164,6 +164,14 @@ module Gem
 
       def verifier_for(lockfile_data)
         expected_checksums = lockfile_data&.sha256_checksums || {}
+        config = Configuration.load
+        return @verifier_class.new(expected_checksums:) unless config.checksum_providers?
+
+        client = RubygemsClient.new(
+          checksum_providers: RubygemsClient.default_checksum_providers + config.checksum_providers
+        )
+        @verifier_class.new(expected_checksums:, client:)
+      rescue ArgumentError
         @verifier_class.new(expected_checksums:)
       end
 

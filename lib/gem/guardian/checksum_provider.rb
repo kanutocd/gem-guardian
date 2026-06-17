@@ -58,6 +58,50 @@ module Gem
         end
       end
 
+      # Restricts another checksum provider to dependencies resolved from a
+      # matching gem source.
+      #
+      # This lets project configuration attach publisher checksum URLs to a
+      # private registry without probing that URL for every public gem. Source
+      # matching is prefix-based after trailing slashes are normalized, so a
+      # configured source such as `https://gems.contribsys.com/` matches locked
+      # dependency sources under that registry.
+      class SourceScoped
+        # @param source [String] source URI prefix this provider applies to
+        # @param provider [#checksum_for] checksum provider to delegate to
+        def initialize(source:, provider:)
+          @source = normalize_source(source)
+          @provider = provider
+        end
+
+        # @param dependency [Dependency] dependency whose source should be checked
+        # @param client [RubygemsClient] client passed to the delegated provider
+        # @return [Result, nil] delegated checksum result when the source matches, otherwise +nil+
+        def checksum_for(dependency, client:)
+          return unless source_matches?(dependency.source)
+
+          @provider.checksum_for(dependency, client:)
+        end
+
+        private
+
+        def source_matches?(source)
+          return false if source.to_s.empty?
+
+          normalize_source(source).start_with?(@source)
+        end
+
+        def normalize_source(source)
+          value = source.to_s
+          uri = URI(value)
+          uri.user = nil
+          uri.password = nil
+          uri.to_s.delete_suffix("/")
+        rescue URI::InvalidURIError
+          value.delete_suffix("/")
+        end
+      end
+
       # Reads checksum metadata from a publisher-controlled checksum URL.
       #
       # This is intentionally generic. Commercial or self-hosted publishers can

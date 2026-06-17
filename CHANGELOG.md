@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-## [0.3.1] Unreleased
+## [0.4.0] Unreleased
 
+- Add `.gem-guardian.yml` project configuration for publisher checksum providers.
+- Support source-scoped checksum URL providers for private/commercial gem registries.
 - Tighten gemspec positioning around lockfile, registry, artifact checksum verification, and supply-chain provenance.
 - Add checksum-provider branch coverage for the default `Net::HTTP` path used by publisher checksum URLs.
 - Keep the known JSON stdout noise issue tracked as a follow-up rather than blocking the checksum-provider release.
