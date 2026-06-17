@@ -39,6 +39,36 @@ module Gem
           assert_equal "downloaded", File.binread(path)
         end
       end
+
+
+      def test_path_for_uses_source_specific_cache_directory
+        Dir.mktmpdir do |dir|
+          dependency = Dependency.new(name: "private-gem", version: "1.0.0", platform: "ruby",
+                                      source: "https://rubygems.pkg.github.com/kanutocd")
+          client = FakeClient.new(downloaded: nil)
+
+          store = ArtifactStore.new(client:, cache_dir: dir)
+          path = store.path_for(dependency)
+
+          refute_equal File.join(dir, dependency.gem_filename), path
+          assert_match(%r{/private-gem-1\.0\.0\.gem\z}, path)
+          assert_equal [dependency, path], client.downloaded
+        end
+      end
+
+
+      def test_path_for_treats_empty_source_as_default_cache_directory
+        Dir.mktmpdir do |dir|
+          dependency = Dependency.new(name: "rake", version: "13.2.1", platform: "ruby", source: "")
+          client = FakeClient.new(downloaded: nil)
+
+          store = ArtifactStore.new(client:, cache_dir: dir)
+          path = store.path_for(dependency)
+
+          assert_equal File.join(dir, dependency.gem_filename), path
+        end
+      end
+
     end
   end
 end

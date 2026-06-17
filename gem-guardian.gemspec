@@ -8,20 +8,22 @@ Gem::Specification.new do |spec|
   spec.authors = ["Kenneth Demanawa"]
   spec.email = ["kenneth.c.demanawa@gmail.com"]
 
-  spec.summary = "Consumer-side integrity verification for Ruby gems."
+  spec.summary = "Gem integrity and supply-chain verification for Ruby."
   spec.description = <<~DESC
-    Audits Bundler checksum coverage and verifies Ruby gem artifacts against RubyGems SHA256 checksums when needed.
+    Verifies gem integrity using lockfile, registry, and artifact checksums,
+    audits Bundler checksum coverage, and reports supply-chain provenance
+    when available.
   DESC
-  spec.homepage = "https://github.com/kanutocd/gem-guardian"
+
+  spec.homepage = "https://kanutocd.github.io/gem-guardian"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"
 
-  spec.metadata = {
-    "homepage_uri" => spec.homepage,
-    "source_code_uri" => spec.homepage,
-    "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
-    "rubygems_mfa_required" => "true"
-  }
+  spec.metadata["homepage_uri"] = spec.homepage
+  spec.metadata["documentation_uri"] = spec.homepage
+  spec.metadata["source_code_uri"] = "https://github.com/kanutocd/gem-guardian"
+  spec.metadata["changelog_uri"] = "#{spec.metadata["source_code_uri"]}/blob/main/CHANGELOG.md"
+  spec.metadata["rubygems_mfa_required"] = "true"
 
   spec.files = Dir.chdir(__dir__) do
     tracked_files = `git ls-files -z`.split("\x0")

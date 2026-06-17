@@ -196,6 +196,52 @@ module Gem
         assert_nil verifier.send(:release_attestation, { "html_url" => "https://github.com/kanutocd/gem-guardian/releases/tag/v0.1.1" })
       end
 
+
+
+      def test_private_helpers_cover_empty_version_and_non_matching_assets
+        verifier = GitHubReleaseVerifier.new(client: GitHubClient.new(http: FakeHTTP.new({})))
+
+        assert_nil verifier.send(:tag_from_version, "")
+        refute verifier.send(:checksum_asset_name?).call("README.md")
+        refute verifier.send(:signature_asset_name?).call("README.md")
+      end
+
+      def test_private_helpers_cover_signature_bundle_and_checksum_sum_names
+        verifier = GitHubReleaseVerifier.new(client: GitHubClient.new(http: FakeHTTP.new({})))
+
+        assert verifier.send(:checksum_asset_name?).call("SHA256SUMS")
+        assert verifier.send(:checksum_asset_name?).call("checksums.txt")
+        assert verifier.send(:signature_asset_name?).call("provenance.bundle")
+        assert verifier.send(:signature_asset_name?).call("predicate.intoto.jsonl")
+      end
+
+      def test_private_helpers_cover_signed_tag_and_reason_for_non_hash_values
+        verifier = GitHubReleaseVerifier.new(client: GitHubClient.new(http: FakeHTTP.new({})))
+
+        assert_nil verifier.send(:signed_tag?, nil)
+        assert_nil verifier.send(:verification_reason, nil)
+      end
+
+      def test_private_helpers_cover_boolean_release_attestation_values
+        verifier = GitHubReleaseVerifier.new(client: GitHubClient.new(http: FakeHTTP.new({})))
+
+        assert_equal true, verifier.send(:release_attestation, { "attestation" => true })
+        assert_nil verifier.send(:release_attestation, { "provenance" => false })
+        assert_equal true, verifier.send(:release_attestation, { "artifact_attestations" => [{ "url" => "x" }] })
+      end
+
+      def test_verify_reports_error_when_release_client_raises_after_repository_resolution
+        client = Object.new
+        def client.release(_repository, _tag) = raise "network down"
+        verifier = GitHubReleaseVerifier.new(client:)
+
+        result = verifier.verify(build_provenance)
+
+        assert_equal :error, result.status
+        assert_equal "kanutocd/gem-guardian", result.repository
+        assert_kind_of RuntimeError, result.error
+      end
+
       private
 
       def build_provenance(repository: "https://github.com/kanutocd/gem-guardian",

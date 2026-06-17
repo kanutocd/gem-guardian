@@ -18,3 +18,15 @@ Style/StringLiterals:
 
 Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
+
+Metrics/ClassLength:
+  Max: 110
+
+Metrics/MethodLength:
+  Max: 16
+
+Layout/LineLength:
+  Max: 130
+
+Metrics/ParameterLists:
+  CountKeywordArgs: false

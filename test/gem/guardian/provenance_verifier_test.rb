@@ -162,6 +162,29 @@ module Gem
         assert_equal :verified, result.status
         assert_nil result.github_release
       end
+
+
+      def test_provenance_status_is_verified_when_artifact_sha_is_missing
+        verifier = ProvenanceVerifier.new(client: FakeClient.new(nil))
+        record = ProvenanceRecord.new(
+          trusted_publishing: true,
+          repository: nil,
+          ref: nil,
+          workflow: nil,
+          issuer: nil,
+          subject: nil,
+          sha256: "a" * 64,
+          attestation_url: nil
+        )
+
+        assert_equal :verified, verifier.send(:provenance_status, record, nil)
+      end
+
+      def test_combine_status_uses_github_status_when_provenance_is_unsupported
+        verifier = ProvenanceVerifier.new(client: FakeClient.new(nil))
+
+        assert_equal :verified, verifier.send(:combine_status, :unsupported, :verified)
+      end
     end
   end
 end

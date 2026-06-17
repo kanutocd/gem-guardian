@@ -61,7 +61,6 @@ module Gem
       end
 
       # Returns the non-error provenance fields.
-      # rubocop:disable Metrics/MethodLength
       def provenance_fields(result)
         {
           status: result.status,
@@ -76,10 +75,8 @@ module Gem
           attestation_url: result.attestation_url
         }
       end
-      # rubocop:enable Metrics/MethodLength
 
       # Returns the GitHub release details for a provenance result.
-      # rubocop:disable Metrics/MethodLength
       def github_release_hash(result)
         return nil unless result
 
@@ -96,13 +93,15 @@ module Gem
           error: error_hash(result.error)
         }
       end
-      # rubocop:enable Metrics/MethodLength
 
       # Returns the checksum payload for a verification result.
       def checksum_hash(result)
         {
           status: result.status,
           expected_sha256: result.expected_sha256,
+          registry_sha256: result.respond_to?(:registry_sha256) ? result.registry_sha256 : nil,
+          registry_checksum_provider: result.respond_to?(:registry_checksum_provider) ? result.registry_checksum_provider : nil,
+          registry_checksum_uri: result.respond_to?(:registry_checksum_uri) ? result.registry_checksum_uri : nil,
           actual_sha256: result.actual_sha256,
           artifact_path: result.artifact_path,
           checksum_source: result.checksum_source,

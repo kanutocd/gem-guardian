@@ -14,7 +14,7 @@ module Gem
     end
 
     # Verifies GitHub release checksum, signature, and attestation metadata.
-    # rubocop:disable Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/ClassLength, Metrics/ParameterLists, Metrics/CyclomaticComplexity
     class GitHubReleaseVerifier
       def initialize(client: GitHubClient.new)
         @client = client
@@ -195,6 +195,6 @@ module Gem
         :unsupported
       end
     end
-    # rubocop:enable Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/ClassLength, Metrics/ParameterLists, Metrics/CyclomaticComplexity
   end
 end

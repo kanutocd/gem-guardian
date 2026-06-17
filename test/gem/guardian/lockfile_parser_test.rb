@@ -83,6 +83,37 @@ module Gem
         end
       end
 
+      def test_parses_dependency_source_from_gem_sections
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "Gemfile.lock")
+          File.write(path, <<~LOCK)
+            GEM
+              remote: https://rubygems.org/
+              specs:
+                rake (13.2.1)
+
+            GEM
+              remote: https://rubygems.pkg.github.com/kanutocd/
+              specs:
+                cdc-orchestrator-pro (0.1.0)
+
+            CHECKSUMS
+              rake (13.2.1) sha256=#{"a" * 64}
+              cdc-orchestrator-pro (0.1.0) sha256=#{"c" * 64}
+
+            PLATFORMS
+              ruby
+          LOCK
+
+          lockfile = LockfileParser.new(path).parse
+          dependency = lockfile.dependencies.find { |item| item.name == "cdc-orchestrator-pro" }
+
+          assert_equal "https://rubygems.pkg.github.com/kanutocd/", dependency.source
+          assert_equal "c" * 64, lockfile.checksum_for(dependency)
+          assert_equal [], lockfile.missing_checksum_dependencies
+        end
+      end
+
       def test_ignores_malformed_checksum_pairs
         Dir.mktmpdir do |dir|
           path = File.join(dir, "Gemfile.lock")

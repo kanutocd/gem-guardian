@@ -1,6 +1,28 @@
 # Changelog
 
-## [Unreleased]
+## Unreleased
+
+## [0.3.1] Unreleased
+
+- Tighten gemspec positioning around lockfile, registry, artifact checksum verification, and supply-chain provenance.
+- Add checksum-provider branch coverage for the default `Net::HTTP` path used by publisher checksum URLs.
+- Keep the known JSON stdout noise issue tracked as a follow-up rather than blocking the checksum-provider release.
+
+- Implemented checksum-source triage: lockfile, registry, and artifact.
+- Added optional registry SHA256 cross-check in lockfile mode.
+- Updated JSON checksum payloads with `registry_sha256`.
+- Clarified README trust model around `PASS` vs `RECORDED`.
+
+- Resolve explicit private-registry checksums through Bundler/RubyGems Compact Index metadata (`/info/<gem>`) when RubyGems.org-style versions APIs are unavailable.
+- Fall back to artifact digest recording for explicit private-registry gems when no independent registry checksum is exposed.
+- Skip Trusted Publishing provenance lookups for non-RubyGems.org sources so private registry gems report unsupported provenance instead of API 404 errors.
+
+- Improve YARD documentation for CLI lockfile filtering and progress helpers.
+- Expand README with real-world Rails provenance results, private registry behavior, lockfile filtering, CI/CD guidance, and registry audit usage.
+
+- Fix registry audit source handling by preserving `Gem::SourceList` for `Gem::SpecFetcher`.
+- Add regression coverage for registry source normalization and private/source-specific artifact paths.
+- Add focused branch coverage for RubyGems client edge cases around source resolution, redirects, authentication, and provenance parsing.
 
 ## [0.3.0] - 2026-06-12
 

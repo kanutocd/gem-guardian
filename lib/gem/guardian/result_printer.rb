@@ -29,16 +29,19 @@ module Gem
 
       # Prints a successful verification result.
       def print_ok_result(result, label, lockfile_mode)
-        prefix = lockfile_mode && result.checksum_source == :rubygems ? "FALLBACK" : "PASS"
+        prefix = ok_result_prefix(result, lockfile_mode)
         @stdout.puts "#{prefix} #{label}"
         @stdout.puts "     sha256 #{result.actual_sha256}"
-        @stdout.puts "     source #{result.checksum_source}" if lockfile_mode && result.checksum_source
+        @stdout.puts "     source #{result.checksum_source}" if show_checksum_source?(result, lockfile_mode)
+        print_registry_cross_check(result)
+        print_registry_provider(result)
       end
 
       # Prints a checksum mismatch.
       def print_mismatch_result(result, label)
         @stdout.puts "FAIL #{label}"
         @stdout.puts "     expected #{result.expected_sha256}"
+        @stdout.puts "     registry #{result.registry_sha256}" if result.respond_to?(:registry_sha256) && result.registry_sha256
         @stdout.puts "     actual   #{result.actual_sha256}"
       end
 
@@ -110,18 +113,47 @@ module Gem
         Usage:
           gem-guardian verify [--lockfile Gemfile.lock] [--json] [--provenance]
           gem-guardian verify GEM:VERSION[:PLATFORM] [GEM:VERSION[:PLATFORM] ...]
+          gem-guardian verify --lockfile Gemfile.lock [--provenance] GEM:VERSION[:PLATFORM] [...]
           gem-guardian version
           gem-guardian help
 
         Examples:
           gem-guardian verify
-        gem-guardian verify sidekiq:8.1.6
+        gem-guardian verify rails:8.1.3
+        gem-guardian verify --lockfile Gemfile.lock --provenance mammoth:0.1.1
         gem-guardian verify cdc-sidekiq:0.1.1
         gem-guardian verify nokogiri:1.18.9:x86_64-linux
         gem-guardian verify --json --provenance ratomic:0.4.1
       USAGE
 
       private
+
+      def ok_result_prefix(result, lockfile_mode)
+        return "RECORDED" if result.checksum_source == :artifact
+        return "FALLBACK" if lockfile_mode && result.checksum_source == :registry
+
+        "PASS"
+      end
+
+      def show_checksum_source?(result, _lockfile_mode)
+        result.checksum_source
+      end
+
+      def print_registry_cross_check(result)
+        return unless result.respond_to?(:registry_sha256)
+        return unless result.registry_sha256
+        return if result.checksum_source == :registry
+
+        @stdout.puts "     registry #{result.registry_sha256}"
+      end
+
+      def print_registry_provider(result)
+        return unless result.respond_to?(:registry_checksum_provider)
+        return unless result.registry_checksum_provider
+
+        @stdout.puts "     provider #{result.registry_checksum_provider}"
+        @stdout.puts "     verify #{result.registry_checksum_uri}" if result.registry_checksum_uri
+      end
 
       def result_label(result)
         dependency = result.dependency
@@ -142,7 +174,6 @@ module Gem
       end
 
       # Returns the GitHub release fields to render for a provenance result.
-      # rubocop:disable Metrics/MethodLength
       def github_release_fields(result)
         [
           ["github release", result.status],
@@ -156,7 +187,6 @@ module Gem
           ["release url", result.release_url]
         ]
       end
-      # rubocop:enable Metrics/MethodLength
 
       # Prints a GitHub release provenance result.
       def print_github_release_result(result)

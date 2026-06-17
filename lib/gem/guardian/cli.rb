@@ -7,8 +7,64 @@ module Gem
   # Command-line interface and output helpers.
   module Guardian
     # Command-line entry point for gem-guardian.
-    # rubocop:disable Metrics/ClassLength, Metrics/ParameterLists
+    # rubocop:disable Metrics/ClassLength
     class CLI
+      # Lightweight lockfile data adapter used when a user verifies only a subset
+      # of gems from a Bundler lockfile.
+      #
+      # {LockfileParser} returns the full dependency graph and all parsed checksum
+      # entries. When the CLI receives both +--lockfile+ and explicit
+      # +GEM:VERSION[:PLATFORM]+ arguments, this view narrows that data to the
+      # requested dependencies while preserving the same reader methods consumed by
+      # {Verifier}, {ReportBuilder}, and {ResultPrinter}.
+      #
+      # @!attribute [r] dependencies
+      #   @return [Array<Dependency>] dependencies selected for verification
+      # @!attribute [r] checksums
+      #   @return [Hash{Dependency => Hash{String => String}}] checksum algorithms
+      #     keyed by dependency
+      # @!attribute [r] checksums_section_present
+      #   @return [Boolean] whether the source lockfile contained a +CHECKSUMS+
+      #     section
+      LockfileDataView = Data.define(:dependencies, :checksums, :checksums_section_present) do
+        # Looks up a checksum for a dependency and algorithm.
+        #
+        # @param dependency [Dependency] dependency to look up
+        # @param algorithm [String] checksum algorithm name, currently usually
+        #   +"sha256"+
+        # @return [String, nil] checksum digest when present, otherwise +nil+
+        def checksum_for(dependency, algorithm = "sha256")
+          checksums.fetch(dependency, {}).fetch(algorithm, nil)
+        end
+
+        # Returns only SHA256 checksums from the filtered lockfile data.
+        #
+        # @return [Hash{Dependency => String}] selected dependencies mapped to
+        #   their SHA256 digest
+        def sha256_checksums
+          checksums.each_with_object({}) do |(dependency, algorithms), memo|
+            digest = algorithms["sha256"]
+            memo[dependency] = digest if digest
+          end
+        end
+
+        # Lists selected dependencies that do not have SHA256 lockfile coverage.
+        #
+        # @return [Array<Dependency>] dependencies missing a SHA256 checksum in
+        #   the lockfile view
+        def missing_checksum_dependencies
+          dependencies.reject { |dependency| sha256_checksums.key?(dependency) }
+        end
+
+        # Indicates whether the original lockfile contained a +CHECKSUMS+
+        # section.
+        #
+        # @return [Boolean] +true+ when the source lockfile had checksum metadata
+        def checksums_present?
+          checksums_section_present
+        end
+      end
+
       # Starts the CLI with the provided argv.
       def self.start(argv)
         new(argv).run
@@ -45,7 +101,6 @@ module Gem
       end
 
       # Runs the verify subcommand.
-      # rubocop:disable Metrics/MethodLength
       def verify
         json_output = flag?("--json")
         provenance_mode = flag?("--provenance")
@@ -60,22 +115,51 @@ module Gem
         @stderr.puts e.message
         1
       end
-      # rubocop:enable Metrics/MethodLength
 
       # Parses a GEM:VERSION[:PLATFORM] spec string.
-      def parse_gem_spec(spec)
+      def parse_gem_spec(spec, default_platform: "ruby")
         name, version, platform = spec.split(":", 3)
         raise Error, "Expected GEM:VERSION[:PLATFORM], got: #{spec}" if name.to_s.empty? || version.to_s.empty?
 
-        Dependency.new(name:, version:, platform: platform || "ruby")
+        Dependency.new(name:, version:, platform: platform || default_platform)
       end
 
       def resolve_dependencies
-        lockfile = option_value("--lockfile") || "Gemfile.lock"
+        lockfile_path = option_value("--lockfile")
+        return resolve_explicit_dependencies unless lockfile_path
+
+        lockfile_data = @lockfile_parser_class.new(lockfile_path).parse
+        return [lockfile_data, lockfile_data.dependencies, lockfile_path] if @argv.empty?
+
+        filtered_data = filter_lockfile_data(lockfile_data, @argv.map { |spec| parse_gem_spec(spec, default_platform: nil) })
+        [filtered_data, filtered_data.dependencies, lockfile_path]
+      end
+
+      def resolve_explicit_dependencies
         return [nil, @argv.map { |spec| parse_gem_spec(spec) }, nil] unless @argv.empty?
 
+        lockfile = "Gemfile.lock"
         lockfile_data = @lockfile_parser_class.new(lockfile).parse
         [lockfile_data, lockfile_data.dependencies, lockfile]
+      end
+
+      def filter_lockfile_data(lockfile_data, requested_dependencies)
+        dependencies = requested_dependencies.flat_map do |requested|
+          matches = matching_lockfile_dependencies(lockfile_data.dependencies, requested)
+          raise Error, "Gem not found in lockfile: #{requested.name}:#{requested.version}" if matches.empty?
+
+          matches
+        end.uniq
+        checksums = lockfile_data.checksums.select { |dependency, _algorithms| dependencies.include?(dependency) }
+        LockfileDataView.new(dependencies, checksums, lockfile_data.checksums_section_present)
+      end
+
+      def matching_lockfile_dependencies(lockfile_dependencies, requested)
+        lockfile_dependencies.select do |dependency|
+          dependency.name == requested.name &&
+            dependency.version == requested.version &&
+            (requested.platform.nil? || dependency.platform == requested.platform)
+        end
       end
 
       def verifier_for(lockfile_data)
@@ -175,6 +259,6 @@ module Gem
         0
       end
     end
-    # rubocop:enable Metrics/ClassLength, Metrics/ParameterLists
+    # rubocop:enable Metrics/ClassLength
   end
 end

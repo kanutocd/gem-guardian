@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "digest"
 require "tmpdir"
 
 module Gem
@@ -16,11 +17,21 @@ module Gem
 
       # Returns the local path for +dependency+, downloading it if needed.
       def path_for(dependency)
-        FileUtils.mkdir_p(@cache_dir)
-        path = File.join(@cache_dir, dependency.gem_filename)
+        directory = cache_directory_for(dependency)
+        FileUtils.mkdir_p(directory)
+        path = File.join(directory, dependency.gem_filename)
         return path if File.file?(path)
 
         @client.download_gem(dependency, path)
+      end
+
+      private
+
+      def cache_directory_for(dependency)
+        source = dependency.respond_to?(:source) && dependency.source
+        return @cache_dir if source.to_s.empty?
+
+        File.join(@cache_dir, Digest::SHA256.hexdigest(source)[0, 16])
       end
     end
   end

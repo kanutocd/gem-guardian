@@ -124,6 +124,65 @@ module Gem
 
         assert_nil client.tag_verification("kanutocd/gem-guardian", "v0.1.1")
       end
+
+
+      def test_tag_verification_returns_nil_when_commit_payload_is_not_hash
+        client = GitHubClient.new(http: FakeHTTP.new(
+                                   "/repos/kanutocd/gem-guardian/git/ref/tags/v0.1.1" => SuccessResponse.new(
+                                     JSON.dump(
+                                       "object" => {
+                                         "type" => "commit",
+                                         "sha" => "abc123"
+                                       }
+                                     )
+                                   ),
+                                   "/repos/kanutocd/gem-guardian/commits/abc123" => SuccessResponse.new(JSON.dump([]))
+                                 ))
+
+        assert_nil client.tag_verification("kanutocd/gem-guardian", "v0.1.1")
+      end
+
+      def test_tag_verification_returns_nil_when_commit_hash_lacks_commit_key
+        client = GitHubClient.new(http: FakeHTTP.new(
+                                   "/repos/kanutocd/gem-guardian/git/ref/tags/v0.1.1" => SuccessResponse.new(
+                                     JSON.dump(
+                                       "object" => {
+                                         "type" => "commit",
+                                         "sha" => "abc123"
+                                       }
+                                     )
+                                   ),
+                                   "/repos/kanutocd/gem-guardian/commits/abc123" => SuccessResponse.new(JSON.dump("other" => {}))
+                                 ))
+
+        assert_nil client.tag_verification("kanutocd/gem-guardian", "v0.1.1")
+      end
+
+
+      def test_tag_verification_returns_nil_when_tag_verification_is_not_hash
+        client = GitHubClient.new(http: FakeHTTP.new(
+                                   "/repos/kanutocd/gem-guardian/git/ref/tags/v0.1.1" => SuccessResponse.new(
+                                     JSON.dump(
+                                       "object" => {
+                                         "type" => "tag",
+                                         "sha" => "abc123",
+                                         "verification" => "not-a-hash"
+                                       }
+                                     )
+                                   ),
+                                   "/repos/kanutocd/gem-guardian/commits/abc123" => SuccessResponse.new(JSON.dump([]))
+                                 ))
+
+        assert_nil client.tag_verification("kanutocd/gem-guardian", "v0.1.1")
+      end
+
+      def test_release_returns_nil_for_malformed_json
+        client = GitHubClient.new(http: FakeHTTP.new(
+                                   "/repos/kanutocd/gem-guardian/releases/tags/v0.1.1" => SuccessResponse.new("not json")
+                                 ))
+
+        assert_nil client.release("kanutocd/gem-guardian", "v0.1.1")
+      end
     end
   end
 end

@@ -7,10 +7,10 @@ require_relative "../../test_helper"
 module Gem
   module Guardian
     class CLITest < Minitest::Test
-      FakeLockfileData = Struct.new(:dependencies, :sha256_checksums, :missing_checksum_dependencies,
-                                    keyword_init: true)
+      FakeLockfileData = Struct.new(:dependencies, :sha256_checksums, :missing_checksum_dependencies, :checksums,
+                                    :checksums_section_present, keyword_init: true)
       FakeVerifierResult = Data.define(:dependency, :expected_sha256, :actual_sha256, :artifact_path, :status, :error,
-                                       :checksum_source) do
+                                       :checksum_source, :registry_sha256, :registry_checksum_provider, :registry_checksum_uri) do
         def ok?
           status == :ok
         end
@@ -41,7 +41,10 @@ module Gem
               artifact_path: "/tmp/#{dependency.name}.gem",
               status: :ok,
               error: nil,
-              checksum_source: expected_checksums.key?(dependency) ? :lockfile : :rubygems
+              checksum_source: expected_checksums.key?(dependency) ? :lockfile : :registry,
+              registry_sha256: expected_checksums.key?(dependency) ? "registry" : nil,
+              registry_checksum_provider: expected_checksums.key?(dependency) ? "test" : nil,
+              registry_checksum_uri: expected_checksums.key?(dependency) ? "https://example.test/checksum" : nil
             )
           end
         end
@@ -137,6 +140,93 @@ module Gem
 
         assert_equal 0, status
         assert_equal ["custom.lock"], captured
+      end
+
+
+      def test_verify_can_filter_lockfile_dependencies_by_explicit_specs
+        rake = Dependency.new(name: "rake", version: "13.2.1", platform: "ruby", source: "https://rubygems.org/")
+        sidekiq = Dependency.new(name: "sidekiq", version: "1.0.0", platform: "ruby", source: "https://rubygems.org/")
+        parser_class = Class.new do
+          define_method(:initialize) { |_path| }
+          define_method(:parse) do
+            FakeLockfileData.new(
+              dependencies: [rake, sidekiq],
+              sha256_checksums: { rake => "a" * 64, sidekiq => "b" * 64 },
+              missing_checksum_dependencies: [],
+              checksums: { rake => { "sha256" => "a" * 64 }, sidekiq => { "sha256" => "b" * 64 } },
+              checksums_section_present: true
+            )
+          end
+        end
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--lockfile", "Gemfile.lock", "sidekiq:1.0.0"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: parser_class
+        ).run
+
+        assert_equal 0, status
+        assert_match(/PASS sidekiq 1.0.0 ruby/, stdout.string)
+        refute_match(/PASS rake 13.2.1 ruby/, stdout.string)
+        assert_match(%r{CHECKSUMS coverage: 1/1}, stdout.string)
+      end
+
+      def test_verify_can_filter_all_platforms_for_lockfile_dependency_when_platform_is_omitted
+        linux = Dependency.new(name: "nokogiri", version: "1.19.3", platform: "x86_64-linux")
+        darwin = Dependency.new(name: "nokogiri", version: "1.19.3", platform: "arm64-darwin")
+        parser_class = Class.new do
+          define_method(:initialize) { |_path| }
+          define_method(:parse) do
+            FakeLockfileData.new(
+              dependencies: [linux, darwin],
+              sha256_checksums: { linux => "a" * 64, darwin => "b" * 64 },
+              missing_checksum_dependencies: [],
+              checksums: { linux => { "sha256" => "a" * 64 }, darwin => { "sha256" => "b" * 64 } },
+              checksums_section_present: true
+            )
+          end
+        end
+
+        stdout = StringIO.new
+        status = CLI.new(
+          ["verify", "--lockfile", "Gemfile.lock", "nokogiri:1.19.3"],
+          stdout:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: parser_class
+        ).run
+
+        assert_equal 0, status
+        assert_match(/PASS nokogiri 1.19.3 x86_64-linux/, stdout.string)
+        assert_match(/PASS nokogiri 1.19.3 arm64-darwin/, stdout.string)
+        assert_match(%r{CHECKSUMS coverage: 2/2}, stdout.string)
+      end
+
+      def test_verify_reports_missing_explicit_lockfile_dependency
+        parser_class = Class.new do
+          define_method(:initialize) { |_path| }
+          define_method(:parse) do
+            FakeLockfileData.new(
+              dependencies: [],
+              sha256_checksums: {},
+              missing_checksum_dependencies: [],
+              checksums: {},
+              checksums_section_present: true
+            )
+          end
+        end
+
+        stderr = StringIO.new
+        status = CLI.new(
+          ["verify", "--lockfile", "Gemfile.lock", "missing:1.0.0"],
+          stderr:,
+          verifier_class: FakeVerifier,
+          lockfile_parser_class: parser_class
+        ).run
+
+        assert_equal 1, status
+        assert_match(/Gem not found in lockfile: missing:1.0.0/, stderr.string)
       end
 
       def test_verify_rejects_missing_lockfile_value
@@ -271,7 +361,10 @@ module Gem
                 artifact_path: "/tmp/rake.gem",
                 status: :mismatch,
                 error: nil,
-                checksum_source: :lockfile
+                checksum_source: :lockfile,
+                registry_sha256: nil,
+                registry_checksum_provider: nil,
+                registry_checksum_uri: nil
               ),
               FakeVerifierResult.new(
                 dependency: dependencies.first,
@@ -280,7 +373,10 @@ module Gem
                 artifact_path: nil,
                 status: :error,
                 error: IOError.new("boom"),
-                checksum_source: nil
+                checksum_source: nil,
+                registry_sha256: nil,
+                registry_checksum_provider: nil,
+                registry_checksum_uri: nil
               )
             ]
           end
@@ -326,7 +422,7 @@ module Gem
 
         assert_equal 0, status
         assert_equal "verify", report["command"]
-        assert_equal "0.3.0", report["version"]
+        assert_equal VERSION, report["version"]
         assert_equal "lockfile", report["mode"]
         assert_equal 1, report.dig("checksums", "coverage", "total")
         assert_equal "rake", report.dig("results", 0, "name")
@@ -425,7 +521,10 @@ module Gem
               artifact_path: "/tmp/rake.gem",
               status: :ok,
               error: nil,
-              checksum_source: :rubygems
+              checksum_source: :registry,
+              registry_sha256: "a" * 64,
+                registry_checksum_provider: "test",
+                registry_checksum_uri: "https://example.test/checksum"
             ) } }
           end,
           provenance_verifier_class: Class.new do
@@ -484,7 +583,10 @@ module Gem
               artifact_path: "/tmp/rake.gem",
               status: :ok,
               error: nil,
-              checksum_source: :rubygems
+              checksum_source: :registry,
+              registry_sha256: "a" * 64,
+                registry_checksum_provider: "test",
+                registry_checksum_uri: "https://example.test/checksum"
             ) } }
           end,
           provenance_verifier_class: Class.new do

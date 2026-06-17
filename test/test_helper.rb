@@ -1,21 +1,15 @@
 # frozen_string_literal: true
 
-$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "simplecov"
 
-if ENV.fetch("COVERAGE", "false").to_s == "true"
-  require "simplecov"
-
-  SimpleCov.command_name("Minitest #{ENV.fetch("TEST_GROUP", "all")}")
-
-  SimpleCov.start do
-    enable_coverage :branch
-    add_filter "/test/"
-    add_filter "/sig/"
-    minimum_coverage line: 90
-    minimum_coverage branch: 90
-  end
+SimpleCov.start do
+  enable_coverage :branch
+  track_files "lib/**/*.rb"
+  add_filter "/test/"
+  minimum_coverage line: 95, branch: 94
 end
 
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 require "minitest/autorun"
 require "tmpdir"
 require "stringio"

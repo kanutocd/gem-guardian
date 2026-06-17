@@ -37,7 +37,6 @@ module Gem
 
       private
 
-      # rubocop:disable Metrics/MethodLength
       def build_result(dependency, provenance, artifact_sha256)
         github_release = github_release_result(provenance)
         status = combine_status(provenance_status(provenance, artifact_sha256), github_release&.status)
@@ -70,9 +69,8 @@ module Gem
           github_release:
         }
       end
-      # rubocop:enable Metrics/ParameterLists
-      # rubocop:enable Metrics/MethodLength
 
+      # rubocop:enable Metrics/ParameterLists
       def provenance_status(provenance, artifact_sha256)
         return :unsupported unless provenance.trusted_publishing
         return :verified unless provenance.sha256 && artifact_sha256
