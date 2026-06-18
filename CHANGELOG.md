@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## [0.4.0] Unreleased
+## [0.4.0]
 
 - Add `.gem-guardian.yml` project configuration for publisher checksum providers.
 - Support source-scoped checksum URL providers for private/commercial gem registries.
