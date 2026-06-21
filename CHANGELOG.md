@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add curated RBS signatures for the public API.
+- Restore `rbs:validate` to the default quality checks and package signatures with the gem.
+
 ## [0.4.0]
 
 - Add `.gem-guardian.yml` project configuration for publisher checksum providers.

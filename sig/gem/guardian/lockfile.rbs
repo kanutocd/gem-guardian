@@ -1,0 +1,30 @@
+module Gem
+  module Guardian
+    type checksum_map = Hash[Dependency, Hash[String, String]]
+
+    class LockfileParser
+      GEM_LINE: Regexp
+      REMOTE_LINE: Regexp
+      CHECKSUM_LINE: Regexp
+
+      class LockfileData < Data
+        attr_reader dependencies: Array[Dependency]
+        attr_reader checksums: checksum_map
+        attr_reader checksums_section_present: bool
+
+        def self.new: (Array[Dependency] dependencies, checksum_map checksums, bool checksums_section_present) -> instance
+                    | (dependencies: Array[Dependency], checksums: checksum_map, checksums_section_present: bool) -> instance
+
+        def checksum_for: (Dependency dependency, ?String algorithm) -> String?
+        def sha256_checksums: () -> Hash[Dependency, String]
+        def missing_checksum_dependencies: () -> Array[Dependency]
+        def checksums_present?: () -> bool
+      end
+
+      def initialize: (?String path) -> void
+      def parse: () -> LockfileData
+      def dependencies: () -> Array[Dependency]
+      def checksums: () -> checksum_map
+    end
+  end
+end

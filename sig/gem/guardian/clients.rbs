@@ -1,0 +1,80 @@
+module Gem
+  module Guardian
+    class GitHubClient
+      DEFAULT_HOST: String
+
+      def initialize: (?host: String, ?http: untyped) -> void
+      def release: (String repository, String tag) -> Hash[String, untyped]?
+      def tag_verification: (String repository, String tag) -> Hash[String, untyped]?
+    end
+
+    class RubygemsClient
+      class TrustedPublishingProvenance < Data
+        attr_reader trusted_publishing: bool
+        attr_reader repository: String?
+        attr_reader ref: String?
+        attr_reader workflow: String?
+        attr_reader issuer: String?
+        attr_reader subject: String?
+        attr_reader sha256: String?
+        attr_reader attestation_url: String?
+
+        def self.new: (
+          bool trusted_publishing,
+          String? repository,
+          String? ref,
+          String? workflow,
+          String? issuer,
+          String? subject,
+          String? sha256,
+          String? attestation_url
+        ) -> instance
+        | (
+          trusted_publishing: bool,
+          repository: String?,
+          ref: String?,
+          workflow: String?,
+          issuer: String?,
+          subject: String?,
+          sha256: String?,
+          attestation_url: String?
+        ) -> instance
+      end
+
+      SOURCE_COMMIT_PATTERN: Regexp
+      BUILD_FILE_PATTERN: Regexp
+      LOG_ENTRY_PATTERN: Regexp
+      SHA256_PATTERN: Regexp
+      WORKFLOW_PATTERN: Regexp
+      DEFAULT_HOST: String
+      MAX_REDIRECTS: Integer
+      OPEN_TIMEOUT: Integer
+      READ_TIMEOUT: Integer
+
+      def self.default_checksum_providers: () -> Array[ChecksumProvider::_Provider]
+
+      def initialize: (
+        ?host: String,
+        ?http: untyped,
+        ?credentials: untyped,
+        ?spec_fetcher: untyped,
+        ?sources: untyped,
+        ?checksum_providers: Array[ChecksumProvider::_Provider]?
+      ) -> void
+
+      def resolve_dependency: (Dependency dependency) -> Dependency
+      def expected_sha256: (Dependency dependency) -> String
+      def registry_checksum: (Dependency dependency) -> ChecksumProvider::Result?
+      def sanitize_uri: (untyped uri) -> String
+      def rubygems_api_checksum: (Dependency dependency) -> ChecksumProvider::Result?
+      def compact_index_registry_checksum: (Dependency dependency) -> ChecksumProvider::Result?
+      def trusted_publishing_provenance: (Dependency dependency) -> TrustedPublishingProvenance?
+      def download_gem: (Dependency dependency, String destination) -> String
+    end
+
+    class ArtifactStore
+      def initialize: (client: RubygemsClient, ?cache_dir: String) -> void
+      def path_for: (Dependency dependency) -> String
+    end
+  end
+end

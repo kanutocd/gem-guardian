@@ -1,0 +1,33 @@
+module Gem
+  module Guardian
+    class CLI
+      class LockfileDataView < Data
+        attr_reader dependencies: Array[Dependency]
+        attr_reader checksums: checksum_map
+        attr_reader checksums_section_present: bool
+
+        def self.new: (Array[Dependency] dependencies, checksum_map checksums, bool checksums_section_present) -> instance
+                    | (dependencies: Array[Dependency], checksums: checksum_map, checksums_section_present: bool) -> instance
+
+        def checksum_for: (Dependency dependency, ?String algorithm) -> String?
+        def sha256_checksums: () -> Hash[Dependency, String]
+        def missing_checksum_dependencies: () -> Array[Dependency]
+        def checksums_present?: () -> bool
+      end
+
+      def self.start: (Array[String] argv) -> Integer
+
+      def initialize: (
+        Array[String] argv,
+        ?stdout: untyped,
+        ?stderr: untyped,
+        ?verifier_class: untyped,
+        ?lockfile_parser_class: untyped,
+        ?provenance_verifier_class: untyped,
+        ?report_builder_class: untyped
+      ) -> void
+
+      def run: () -> Integer
+    end
+  end
+end

@@ -1,0 +1,63 @@
+module Gem
+  module Guardian
+    module ChecksumProvider
+      interface _Provider
+        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
+      end
+
+      class Result < Data
+        attr_reader sha256: String
+        attr_reader source: Symbol
+        attr_reader provider: String
+        attr_reader verification_uri: String?
+
+        def self.new: (String sha256, Symbol source, String provider, String? verification_uri) -> instance
+                    | (sha256: String, source: Symbol, provider: String, verification_uri: String?) -> instance
+
+        def to_h: () -> Hash[Symbol, String | Symbol | nil]
+      end
+
+      class RubyGemsApi
+        include _Provider
+
+        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
+      end
+
+      class CompactIndex
+        include _Provider
+
+        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
+      end
+
+      class SourceScoped
+        include _Provider
+
+        def initialize: (source: String, provider: _Provider) -> void
+        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
+      end
+
+      class Url
+        include _Provider
+
+        SHA256_PATTERN: Regexp
+        OPEN_TIMEOUT: Integer
+        READ_TIMEOUT: Integer
+
+        def initialize: (template: String, ?http: untyped, ?provider_name: String) -> void
+        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
+      end
+    end
+
+    class Configuration
+      DEFAULT_PATH: String
+
+      attr_reader path: String?
+      attr_reader checksum_providers: Array[ChecksumProvider::_Provider]
+
+      def self.load: (?path: String?, ?cwd: String) -> Configuration
+
+      def initialize: (?path: String?, ?checksum_providers: Array[ChecksumProvider::_Provider]) -> void
+      def checksum_providers?: () -> bool
+    end
+  end
+end

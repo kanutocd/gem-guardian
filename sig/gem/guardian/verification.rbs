@@ -1,0 +1,125 @@
+module Gem
+  module Guardian
+    type verification_status = :ok | :mismatch | :error
+    type checksum_source = :lockfile | :registry | :artifact
+    type provenance_status = :verified | :unsupported | :mismatch | :error
+
+    class VerificationResult < Data
+      attr_reader dependency: Dependency
+      attr_reader expected_sha256: String?
+      attr_reader actual_sha256: String?
+      attr_reader artifact_path: String?
+      attr_reader status: verification_status
+      attr_reader error: Exception?
+      attr_reader checksum_source: checksum_source?
+      attr_reader registry_sha256: String?
+      attr_reader registry_checksum_provider: String?
+      attr_reader registry_checksum_uri: String?
+
+      def self.new: (
+        dependency: Dependency,
+        expected_sha256: String?,
+        actual_sha256: String?,
+        artifact_path: String?,
+        status: verification_status,
+        error: Exception?,
+        checksum_source: checksum_source?,
+        registry_sha256: String?,
+        registry_checksum_provider: String?,
+        registry_checksum_uri: String?
+      ) -> instance
+
+      def ok?: () -> bool
+    end
+
+    class Verifier
+      def initialize: (
+        ?client: RubygemsClient,
+        ?artifact_store: ArtifactStore?,
+        ?expected_checksums: Hash[Dependency, String]
+      ) -> void
+
+      def verify: (Dependency dependency) -> VerificationResult
+      def verify_all: (Enumerable[Dependency] dependencies) -> Array[VerificationResult]
+    end
+
+    class GitHubReleaseResult < Data
+      attr_reader dependency: Dependency
+      attr_reader status: provenance_status
+      attr_reader repository: String?
+      attr_reader tag: String?
+      attr_reader checksum_assets: Array[String]
+      attr_reader signature_assets: Array[String]
+      attr_reader signed_tag: bool?
+      attr_reader signed_tag_reason: String?
+      attr_reader release_attestation: bool?
+      attr_reader release_url: String?
+      attr_reader error: Exception?
+
+      def self.new: (
+        dependency: Dependency,
+        status: provenance_status,
+        repository: String?,
+        tag: String?,
+        checksum_assets: Array[String],
+        signature_assets: Array[String],
+        signed_tag: bool?,
+        signed_tag_reason: String?,
+        release_attestation: bool?,
+        release_url: String?,
+        error: Exception?
+      ) -> instance
+
+      def verified?: () -> bool
+    end
+
+    class GitHubReleaseVerifier
+      def initialize: (?client: GitHubClient) -> void
+      def verify: (RubygemsClient::TrustedPublishingProvenance provenance) -> GitHubReleaseResult
+    end
+
+    class ProvenanceResult < Data
+      attr_reader dependency: Dependency
+      attr_reader status: provenance_status
+      attr_reader trusted_publishing: bool?
+      attr_reader repository: String?
+      attr_reader ref: String?
+      attr_reader workflow: String?
+      attr_reader issuer: String?
+      attr_reader subject: String?
+      attr_reader expected_sha256: String?
+      attr_reader actual_sha256: String?
+      attr_reader error: Exception?
+      attr_reader attestation_url: String?
+      attr_reader github_release: GitHubReleaseResult?
+
+      def self.new: (
+        dependency: Dependency,
+        status: provenance_status,
+        trusted_publishing: bool?,
+        repository: String?,
+        ref: String?,
+        workflow: String?,
+        issuer: String?,
+        subject: String?,
+        expected_sha256: String?,
+        actual_sha256: String?,
+        error: Exception?,
+        attestation_url: String?,
+        github_release: GitHubReleaseResult?
+      ) -> instance
+
+      def verified?: () -> bool
+    end
+
+    class ProvenanceVerifier
+      def initialize: (
+        ?client: RubygemsClient,
+        ?github_release_verifier: GitHubReleaseVerifier
+      ) -> void
+
+      def verify: (Dependency dependency, ?artifact_sha256: String?) -> ProvenanceResult
+      def verify_all: (Enumerable[VerificationResult] results) -> Array[ProvenanceResult]
+    end
+  end
+end

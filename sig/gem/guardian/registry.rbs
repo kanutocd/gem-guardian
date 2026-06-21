@@ -1,0 +1,51 @@
+module Gem
+  module Guardian
+    class Registry
+      class Entry < Data
+        attr_reader name: String
+        attr_reader version: String
+        attr_reader platform: String
+        attr_reader source: String
+
+        def self.new: (name: String, version: String, platform: String, source: String) -> instance
+                    | (String name, String version, String platform, String source) -> instance
+
+        def dependency: () -> Dependency
+      end
+
+      def initialize: (?sources: untyped, ?spec_fetcher: untyped) -> void
+      def each_latest_spec: (?limit: Integer?) { (Entry) -> void } -> untyped
+                          | (?limit: Integer?) -> Enumerator[Entry, untyped]
+      def latest_specs: (?limit: Integer?) -> Array[Entry]
+    end
+
+    class RegistryAudit
+      class EntryResult < Data
+        attr_reader entry: Registry::Entry
+        attr_reader provenance: ProvenanceResult
+
+        def self.new: (entry: Registry::Entry, provenance: ProvenanceResult) -> instance
+                    | (Registry::Entry entry, ProvenanceResult provenance) -> instance
+
+        def dependency: () -> Dependency
+      end
+
+      class Result < Data
+        attr_reader results: Array[EntryResult]
+
+        def self.new: (Array[EntryResult] results) -> instance
+                    | (results: Array[EntryResult]) -> instance
+
+        def counts: () -> Hash[provenance_status, Integer]
+        def verified: () -> Array[EntryResult]
+        def unsupported: () -> Array[EntryResult]
+        def errors: () -> Array[EntryResult]
+        def mismatches: () -> Array[EntryResult]
+        def total: () -> Integer
+      end
+
+      def initialize: (?registry: Registry, ?provenance_verifier: ProvenanceVerifier) -> void
+      def run: (?limit: Integer?) -> Result
+    end
+  end
+end

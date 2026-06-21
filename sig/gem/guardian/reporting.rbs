@@ -1,0 +1,32 @@
+module Gem
+  module Guardian
+    class ReportBuilder
+      def initialize: (version: String) -> void
+
+      def build: (
+        Enumerable[VerificationResult] results,
+        lockfile_data: LockfileParser::LockfileData | CLI::LockfileDataView | nil,
+        ?provenance_results: Array[ProvenanceResult],
+        ?lockfile_path: String?
+      ) -> Hash[Symbol, untyped]
+    end
+
+    class ResultPrinter
+      USAGE: String
+
+      def initialize: (stdout: untyped) -> void
+      def print_results: (Enumerable[VerificationResult] results, lockfile_mode: bool) -> void
+      def print_result: (VerificationResult result, lockfile_mode: bool) -> void
+      def print_ok_result: (VerificationResult result, String label, bool lockfile_mode) -> void
+      def print_mismatch_result: (VerificationResult result, String label) -> void
+      def print_error_result: (VerificationResult result, String label) -> void
+      def print_lockfile_coverage: (LockfileParser::LockfileData | CLI::LockfileDataView lockfile_data) -> void
+      def print_provenance_results: (Enumerable[ProvenanceResult] results) -> void
+      def print_provenance_result: (ProvenanceResult result) -> void
+      def print_verified_provenance_result: (ProvenanceResult result, String label) -> void
+      def print_mismatched_provenance_result: (ProvenanceResult result, String label) -> void
+      def print_unsupported_provenance_result: (ProvenanceResult result, String label) -> void
+      def usage: () -> void
+    end
+  end
+end

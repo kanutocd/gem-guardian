@@ -19,6 +19,13 @@ end
 
 YARD::Rake::YardocTask.new(:yard)
 
+namespace :rbs do
+  desc "Validate RBS signatures"
+  task :validate do
+    sh "bundle exec rbs validate"
+  end
+end
+
 namespace :yard do
   desc "Validate YARD documentation coverage"
   task :validate do
@@ -40,4 +47,4 @@ namespace :yard do
   end
 end
 
-task default: %i[test rubocop yard:validate]
+task default: %i[test rubocop rbs:validate yard:validate]

@@ -1,0 +1,39 @@
+module Gem
+  module Guardian
+    VERSION: String
+
+    class Error < StandardError
+    end
+
+    class ChecksumNotFound < Error
+    end
+
+    class ArtifactFetchError < Error
+    end
+
+    class LockfileError < Error
+    end
+
+    class Dependency < Data
+      attr_reader name: String
+      attr_reader version: String
+      attr_reader platform: String?
+      attr_reader source: String?
+
+      def self.new: (name: String, version: String, platform: String?, ?source: String?) -> instance
+
+      def initialize: (name: String, version: String, platform: String?, ?source: String?) -> void
+      def gem_filename: () -> String
+    end
+
+    module Checksum
+      def self.sha256_file: (String path) -> String
+    end
+
+    module Progress
+      def self.update: (untyped message, ?io: untyped, ?force: bool) -> void
+      def self.finish: (?untyped message, ?io: untyped, ?force: bool) -> void
+      def self.enabled?: (?untyped io, ?force: bool) -> bool
+    end
+  end
+end
