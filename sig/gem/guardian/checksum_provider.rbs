@@ -19,21 +19,16 @@ module Gem
 
       class RubyGemsApi
         include _Provider
-
-        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
       end
 
       class CompactIndex
         include _Provider
-
-        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
       end
 
       class SourceScoped
         include _Provider
 
         def initialize: (source: String, provider: _Provider) -> void
-        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
       end
 
       class Url
@@ -44,7 +39,6 @@ module Gem
         READ_TIMEOUT: Integer
 
         def initialize: (template: String, ?http: untyped, ?provider_name: String) -> void
-        def checksum_for: (Dependency dependency, client: RubygemsClient) -> Result?
       end
     end
 

@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+## [0.4.1] - 2026-06-21
+
 - Add curated RBS signatures for the public API.
-- Restore `rbs:validate` to the default quality checks and package signatures with the gem.
+- Restore `rbs:validate` to the default quality checks, load project signatures explicitly, and package them with the gem.
 
 ## [0.4.0]
 

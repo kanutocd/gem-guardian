@@ -22,7 +22,7 @@ YARD::Rake::YardocTask.new(:yard)
 namespace :rbs do
   desc "Validate RBS signatures"
   task :validate do
-    sh "bundle exec rbs validate"
+    sh "bundle exec rbs -I sig validate"
   end
 end
 
